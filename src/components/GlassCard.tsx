@@ -1,19 +1,19 @@
-import React from 'react';
-import { StyleSheet, View, ViewStyle, Platform } from 'react-native';
+import * as React from 'react';
+import { StyleSheet, View, StyleProp, ViewStyle, Platform } from 'react-native';
 
 interface GlassCardProps {
   children: React.ReactNode;
-  style?: ViewStyle | ViewStyle[];
+  style?: StyleProp<ViewStyle>;
   borderColor?: string;
   backgroundColor?: string;
 }
 
-export const GlassCard: React.FC<GlassCardProps> = ({
+export const GlassCard = ({
   children,
   style,
   borderColor = 'rgba(255, 255, 255, 0.08)',
   backgroundColor = 'rgba(255, 255, 255, 0.04)',
-}) => {
+}: GlassCardProps) => {
   return (
     <View
       style={[

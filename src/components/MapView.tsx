@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import * as React from 'react';
+import { useEffect, useRef } from 'react';
 import { StyleSheet, View, Text, Platform } from 'react-native';
 
 interface MapLocation {
@@ -20,16 +21,16 @@ interface MapViewProps {
   selectedPin?: { latitude: number; longitude: number } | null;
 }
 
-export const MapView: React.FC<MapViewProps> = ({
+export const MapView = ({
   locations,
   onPinSelect,
   interactive = false,
   selectedPin = null,
-}) => {
+}: MapViewProps) => {
   const iframeRef = useRef<any>(null);
 
   // Parse locations that have valid coordinates
-  const validLocations = locations.filter((loc) => loc.latitude && loc.longitude);
+  const validLocations = locations.filter((loc: MapLocation) => loc.latitude && loc.longitude);
 
   // Listen to messages from Leaflet Iframe (Web Platform)
   useEffect(() => {
@@ -246,7 +247,7 @@ export const MapView: React.FC<MapViewProps> = ({
         customMapStyle={darkMapStyle}
         onPress={handlePress}
       >
-        {validLocations.map((loc) => (
+        {validLocations.map((loc: MapLocation) => (
           <NativeMarker
             key={loc.id}
             coordinate={{ latitude: loc.latitude as number, longitude: loc.longitude as number }}
@@ -365,7 +366,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#0B0F19',
   },
   nativeMap: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
   },
   fallbackContainer: {
     flex: 1,
