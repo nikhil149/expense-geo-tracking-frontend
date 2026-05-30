@@ -2,12 +2,17 @@ import { create } from 'zustand';
 import { Platform } from 'react-native';
 
 // Dynamically resolve API URL depending on host platform
-// 10.0.2.2 is the standard loopback address for Android Emulators to connect to development machine's localhost
 export const API_BASE_URL = Platform.select({
-  android: 'http://10.0.2.2:5001/api',
+  android: 'http://192.168.100.40:5001/api',
   ios: 'http://localhost:5001/api',
   default: 'http://localhost:5001/api', // handles web and others
 });
+
+export interface User {
+  id: number;
+  email: string;
+  name: string;
+}
 
 export interface Category {
   id: number;
@@ -68,6 +73,11 @@ interface MapFilters {
 }
 
 interface AppStoreState {
+  // Auth state
+  user: User | null;
+  token: string | null;
+  isAuthenticated: boolean;
+
   transactions: Transaction[];
   categories: Category[];
   goals: Goal[];
@@ -77,33 +87,78 @@ interface AppStoreState {
   isLoading: boolean;
   error: string | null;
   mapFilters: MapFilters;
-  
+
   // Actions
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, name: string) => Promise<void>;
+  logout: () => Promise<void>;
+  initializeAuth: () => Promise<void>;
+
   setMapFilters: (filters: Partial<MapFilters>) => void;
   resetMapFilters: () => void;
-  
+
   fetchCategories: () => Promise<void>;
   createCategory: (name: string, color: string, icon: string) => Promise<Category>;
-  
+
   fetchTransactions: (customFilters?: Record<string, any>) => Promise<void>;
   createTransaction: (txData: Omit<Transaction, 'id'> & { goal_id?: number | null }) => Promise<Transaction>;
   updateTransaction: (id: number, txData: Partial<Transaction> & { goal_id?: number | null }) => Promise<Transaction>;
   deleteTransaction: (id: number) => Promise<void>;
-  
+
   fetchGoals: () => Promise<void>;
   fetchGoalDetails: (id: number) => Promise<Goal>;
   createGoal: (goalData: Omit<Goal, 'id' | 'current_amount'>) => Promise<Goal>;
   updateGoal: (id: number, goalData: Partial<Goal>) => Promise<Goal>;
   deleteGoal: (id: number) => Promise<void>;
-  
+
   fetchSummary: () => Promise<void>;
   fetchSpendingByCategory: (startDate?: string, endDate?: string) => Promise<void>;
   fetchSpendingLocations: () => Promise<void>;
-  
+
   loadAllData: () => Promise<void>;
 }
 
+// In-memory token cache for native mobile environments
+const nativeTokenCache: Record<string, string> = {};
+
+const getStorageItem = async (key: string): Promise<string | null> => {
+  try {
+    if (Platform.OS === 'web') {
+      return localStorage.getItem(key);
+    } else {
+      return nativeTokenCache[key] || null;
+    }
+  } catch (e) {
+    return null;
+  }
+};
+
+const setStorageItem = async (key: string, value: string | null): Promise<void> => {
+  try {
+    if (Platform.OS === 'web') {
+      if (value) localStorage.setItem(key, value);
+      else localStorage.removeItem(key);
+    } else {
+      if (value) nativeTokenCache[key] = value;
+      else delete nativeTokenCache[key];
+    }
+  } catch (e) { }
+};
+
+// Helper to resolve request headers with JWT authorization
+const getAuthHeaders = (token: string | null) => {
+  return {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+  };
+};
+
 export const useAppStore = create<AppStoreState>((set, get) => ({
+  // Auth initial state
+  user: null,
+  token: null,
+  isAuthenticated: false,
+
   transactions: [],
   categories: [],
   goals: [],
@@ -121,6 +176,100 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     category_id: null,
     startDate: null,
     endDate: null,
+  },
+
+  initializeAuth: async () => {
+    const token = await getStorageItem('auth_token');
+    const cachedUser = await getStorageItem('auth_user');
+    if (token && cachedUser) {
+      set({
+        token,
+        user: JSON.parse(cachedUser),
+        isAuthenticated: true
+      });
+    }
+  },
+
+  login: async (email, password) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Login failed');
+
+      await setStorageItem('auth_token', data.token);
+      await setStorageItem('auth_user', JSON.stringify(data.user));
+
+      set({
+        token: data.token,
+        user: data.user,
+        isAuthenticated: true,
+        error: null
+      });
+
+      // Fetch user data
+      await get().loadAllData();
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  register: async (email, password, name) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Registration failed');
+
+      await setStorageItem('auth_token', data.token);
+      await setStorageItem('auth_user', JSON.stringify(data.user));
+
+      set({
+        token: data.token,
+        user: data.user,
+        isAuthenticated: true,
+        error: null
+      });
+
+      // Fetch user data
+      await get().loadAllData();
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  logout: async () => {
+    await setStorageItem('auth_token', null);
+    await setStorageItem('auth_user', null);
+    set({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      transactions: [],
+      goals: [],
+      mapLocations: [],
+      spendingByCategory: [],
+      summary: {
+        totalIncome: 0,
+        totalExpense: 0,
+        totalInvestment: 0,
+        netSavings: 0,
+      }
+    });
   },
 
   setMapFilters: (filters) => {
@@ -143,7 +292,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
   fetchCategories: async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/categories`);
+      const res = await fetch(`${API_BASE_URL}/categories`, {
+        headers: getAuthHeaders(get().token)
+      });
       if (!res.ok) throw new Error('Failed to load categories');
       const data = await res.json();
       set({ categories: data });
@@ -157,7 +308,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     try {
       const res = await fetch(`${API_BASE_URL}/categories`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(get().token),
         body: JSON.stringify({ name, color, icon }),
       });
       if (!res.ok) {
@@ -181,7 +332,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       Object.entries(customFilters).forEach(([key, val]) => {
         if (val !== null && val !== undefined) queryParams.append(key, val);
       });
-      const res = await fetch(`${API_BASE_URL}/transactions?${queryParams.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/transactions?${queryParams.toString()}`, {
+        headers: getAuthHeaders(get().token)
+      });
       if (!res.ok) throw new Error('Failed to load transactions');
       const data = await res.json();
       set({ transactions: data });
@@ -195,13 +348,12 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     try {
       const res = await fetch(`${API_BASE_URL}/transactions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(get().token),
         body: JSON.stringify(txData),
       });
       if (!res.ok) throw new Error('Failed to record transaction');
       const newTx = await res.json();
-      
-      // Refresh local metrics and data
+
       await Promise.all([
         get().fetchTransactions(),
         get().fetchGoals(),
@@ -209,7 +361,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         get().fetchSpendingByCategory(),
         get().fetchSpendingLocations()
       ]);
-      
+
       return newTx;
     } catch (err: any) {
       set({ error: err.message });
@@ -224,12 +376,12 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     try {
       const res = await fetch(`${API_BASE_URL}/transactions/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(get().token),
         body: JSON.stringify(txData),
       });
       if (!res.ok) throw new Error('Failed to update transaction');
       const updatedTx = await res.json();
-      
+
       await Promise.all([
         get().fetchTransactions(),
         get().fetchGoals(),
@@ -237,7 +389,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         get().fetchSpendingByCategory(),
         get().fetchSpendingLocations()
       ]);
-      
+
       return updatedTx;
     } catch (err: any) {
       set({ error: err.message });
@@ -252,9 +404,10 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     try {
       const res = await fetch(`${API_BASE_URL}/transactions/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(get().token)
       });
       if (!res.ok) throw new Error('Failed to delete transaction');
-      
+
       await Promise.all([
         get().fetchTransactions(),
         get().fetchGoals(),
@@ -272,7 +425,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
   fetchGoals: async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/goals`);
+      const res = await fetch(`${API_BASE_URL}/goals`, {
+        headers: getAuthHeaders(get().token)
+      });
       if (!res.ok) throw new Error('Failed to load savings goals');
       const data = await res.json();
       set({ goals: data });
@@ -283,7 +438,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
   fetchGoalDetails: async (id) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/goals/${id}`);
+      const res = await fetch(`${API_BASE_URL}/goals/${id}`, {
+        headers: getAuthHeaders(get().token)
+      });
       if (!res.ok) throw new Error(`Failed to load goal details for ${id}`);
       return await res.json();
     } catch (err: any) {
@@ -297,7 +454,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     try {
       const res = await fetch(`${API_BASE_URL}/goals`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(get().token),
         body: JSON.stringify(goalData),
       });
       if (!res.ok) throw new Error('Failed to create savings goal');
@@ -317,7 +474,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     try {
       const res = await fetch(`${API_BASE_URL}/goals/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(get().token),
         body: JSON.stringify(goalData),
       });
       if (!res.ok) throw new Error('Failed to update savings goal');
@@ -337,11 +494,12 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     try {
       const res = await fetch(`${API_BASE_URL}/goals/${id}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(get().token)
       });
       if (!res.ok) throw new Error('Failed to delete savings goal');
       await Promise.all([
         get().fetchGoals(),
-        get().fetchTransactions() // transactions might get unlinked or cascade deleted
+        get().fetchTransactions()
       ]);
     } catch (err: any) {
       set({ error: err.message });
@@ -353,7 +511,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
   fetchSummary: async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/analytics/summary`);
+      const res = await fetch(`${API_BASE_URL}/analytics/summary`, {
+        headers: getAuthHeaders(get().token)
+      });
       if (!res.ok) throw new Error('Failed to fetch finance summary');
       const data = await res.json();
       set({ summary: data });
@@ -367,7 +527,9 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append('startDate', startDate);
       if (endDate) queryParams.append('endDate', endDate);
-      const res = await fetch(`${API_BASE_URL}/analytics/spending-by-category?${queryParams.toString()}`);
+      const res = await fetch(`${API_BASE_URL}/analytics/spending-by-category?${queryParams.toString()}`, {
+        headers: getAuthHeaders(get().token)
+      });
       if (!res.ok) throw new Error('Failed to load spending category details');
       const data = await res.json();
       set({ spendingByCategory: data });
@@ -383,8 +545,10 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
       if (category_id) queryParams.append('category_id', String(category_id));
       if (startDate) queryParams.append('startDate', startDate);
       if (endDate) queryParams.append('endDate', endDate);
-      
-      const res = await fetch(`${API_BASE_URL}/analytics/spending-locations?${queryParams.toString()}`);
+
+      const res = await fetch(`${API_BASE_URL}/analytics/spending-locations?${queryParams.toString()}`, {
+        headers: getAuthHeaders(get().token)
+      });
       if (!res.ok) throw new Error('Failed to load map transactions coordinates');
       const data = await res.json();
       set({ mapLocations: data });
@@ -394,6 +558,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   },
 
   loadAllData: async () => {
+    if (!get().token) return; // Do not fetch if not authenticated
     set({ isLoading: true, error: null });
     try {
       await Promise.all([

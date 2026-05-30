@@ -2,11 +2,22 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { useColorScheme } from 'react-native';
 import * as LucideIcons from 'lucide-react-native';
+import { useAppStore } from '../store/useAppStore';
+import { AuthScreen } from '../screens/AuthScreen';
 const Icons = LucideIcons as any;
 
 export default function TabLayout() {
   const scheme = useColorScheme();
   const isDark = scheme === 'dark';
+  const { isAuthenticated, initializeAuth } = useAppStore();
+
+  React.useEffect(() => {
+    initializeAuth();
+  }, []);
+
+  if (!isAuthenticated) {
+    return <AuthScreen />;
+  }
 
   return (
     <Tabs
