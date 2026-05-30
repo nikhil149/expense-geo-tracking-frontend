@@ -23,8 +23,8 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     <View style={[styles.container, style]}>
       <View style={styles.textRow}>
         <Text style={styles.stats}>
-          ${current.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          <Text style={styles.target}> of ${target.toLocaleString('en-US', { minimumFractionDigits: 0 })}</Text>
+          ₹{current.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <Text style={styles.target}> of ₹{target.toLocaleString('en-IN', { minimumFractionDigits: 0 })}</Text>
         </Text>
         <Text style={[styles.percentage, { color }]}>
           {displayPercentage}%

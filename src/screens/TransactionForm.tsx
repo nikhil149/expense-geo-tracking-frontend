@@ -314,7 +314,7 @@ export const TransactionForm = ({
         {/* Amount & Date */}
         <View style={styles.inputRow}>
           <View style={styles.inputCol}>
-            <Text style={styles.inputLabel}>Amount ($)</Text>
+            <Text style={styles.inputLabel}>Amount (₹)</Text>
             <TextInput
               placeholder="0.00"
               placeholderTextColor="#6B7280"

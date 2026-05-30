@@ -151,7 +151,7 @@ export const GoalsTracker: React.FC = () => {
 
             <View style={styles.inputRow}>
               <View style={styles.inputCol}>
-                <Text style={styles.inputLabel}>Target Amount ($)</Text>
+                <Text style={styles.inputLabel}>Target Amount (₹)</Text>
                 <TextInput
                   placeholder="5000"
                   placeholderTextColor="#6B7280"
@@ -266,7 +266,7 @@ export const GoalsTracker: React.FC = () => {
                       {isCompleted ? (
                         <Text style={styles.completedTag}>Goal Achieved!</Text>
                       ) : (
-                        `$${remaining.toLocaleString('en-US', { maximumFractionDigits: 0 })} remaining`
+                        `₹${remaining.toLocaleString('en-IN', { maximumFractionDigits: 0 })} remaining`
                       )}
                     </Text>
                     <Text style={styles.expandLabel}>
@@ -297,7 +297,7 @@ export const GoalsTracker: React.FC = () => {
                             </Text>
                           </View>
                           <Text style={[styles.investmentAmt, { color: goal.color }]}>
-                            +${inv.allocated_amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            +₹{inv.allocated_amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                           </Text>
                         </View>
                       ))

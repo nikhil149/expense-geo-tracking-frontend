@@ -94,7 +94,7 @@ export const CategoryChart: React.FC<CategoryChartProps> = ({ data }) => {
         <View style={styles.centerTextContainer}>
           <Text style={styles.centerSubText}>Total Spending</Text>
           <Text style={styles.centerMainText}>
-            ${total.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            ₹{total.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </Text>
         </View>
       </View>
@@ -115,7 +115,7 @@ export const CategoryChart: React.FC<CategoryChartProps> = ({ data }) => {
               </View>
               <View style={styles.legendRight}>
                 <Text style={styles.categoryAmount}>
-                  ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
                 <Text style={styles.categoryPercent}>{percent}%</Text>
               </View>

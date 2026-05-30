@@ -98,7 +98,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         <GlassCard style={styles.mainBalanceCard}>
           <Text style={styles.balanceLabel}>Net Cash Balance</Text>
           <Text style={styles.balanceValue}>
-            ${summary.netSavings.toLocaleString('en-US', {
+            ₹{summary.netSavings.toLocaleString('en-IN', {
               minimumFractionDigits: 2,
               maximumFractionDigits: 2,
             })}
@@ -111,7 +111,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <Text style={styles.statLabel}>Income</Text>
               </View>
               <Text style={styles.statValue}>
-                ${summary.totalIncome.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                ₹{summary.totalIncome.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </Text>
             </View>
             <View style={styles.statCol}>
@@ -120,7 +120,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <Text style={styles.statLabel}>Expenses</Text>
               </View>
               <Text style={styles.statValue}>
-                ${summary.totalExpense.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                ₹{summary.totalExpense.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </Text>
             </View>
             <View style={styles.statCol}>
@@ -129,7 +129,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 <Text style={styles.statLabel}>Invested</Text>
               </View>
               <Text style={styles.statValue}>
-                ${summary.totalInvestment.toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                ₹{summary.totalInvestment.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </Text>
             </View>
           </View>
@@ -160,7 +160,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Transactions logs list */}
         {filteredTransactions.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Icons.DollarSign size={40} color="#374151" />
+            <Icons.IndianRupee size={40} color="#374151" />
             <Text style={styles.emptyText}>No matching transactions found.</Text>
           </View>
         ) : (
@@ -219,7 +219,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                         { color: isIncome ? '#10B981' : tx.type === 'investment' ? '#6366F1' : '#EF4444' },
                       ]}
                     >
-                      {isIncome ? '+' : '-'}${txAmt.toLocaleString('en-US', {
+                      {isIncome ? '+' : '-'}₹{txAmt.toLocaleString('en-IN', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}

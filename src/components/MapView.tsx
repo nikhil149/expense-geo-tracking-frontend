@@ -127,7 +127,7 @@ export const MapView = ({
 
             // 1. Draw transactions pins
             locations.forEach(loc => {
-              const amountStr = loc.amount.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+              const amountStr = loc.amount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' });
               const catColor = loc.category_color || '#8B5CF6';
               const typeColor = loc.type === 'income' ? '#10B981' : loc.type === 'investment' ? '#6366F1' : '#EF4444';
               
@@ -252,7 +252,7 @@ export const MapView = ({
             key={loc.id}
             coordinate={{ latitude: loc.latitude as number, longitude: loc.longitude as number }}
             title={loc.title}
-            description={`${loc.type === 'income' ? '+' : '-'}$${loc.amount.toFixed(2)} - ${loc.location_name || ''}`}
+            description={`${loc.type === 'income' ? '+' : '-'}₹${loc.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} - ${loc.location_name || ''}`}
             pinColor={loc.category_color || '#8B5CF6'}
           />
         ))}

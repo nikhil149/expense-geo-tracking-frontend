@@ -67,7 +67,7 @@ export const SpendingMap: React.FC = () => {
       <GlassCard style={styles.floatingHeader}>
         <Text style={styles.headerSub}>Filtered Spending</Text>
         <Text style={styles.headerMain}>
-          ${totalOnMap.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          ₹{totalOnMap.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </Text>
       </GlassCard>
 
@@ -204,7 +204,7 @@ export const SpendingMap: React.FC = () => {
                           { color: loc.type === 'income' ? '#10B981' : loc.type === 'investment' ? '#6366F1' : '#EF4444' },
                         ]}
                       >
-                        {isExpense ? '-' : '+'}${loc.amount.toFixed(2)}
+                        {isExpense ? '-' : '+'}₹{loc.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </Text>
                     </View>
                   </GlassCard>
