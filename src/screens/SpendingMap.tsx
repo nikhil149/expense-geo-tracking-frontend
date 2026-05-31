@@ -7,6 +7,7 @@ import {
   ScrollView,
   Pressable,
   Platform,
+  Linking,
 } from 'react-native';
 import { useAppStore } from '../store/useAppStore';
 import { MapView } from '../components/MapView';
@@ -188,9 +189,22 @@ export const SpendingMap: React.FC = () => {
                       <View style={[styles.colorBullet, { backgroundColor: catColor }]} />
                       <View style={styles.locItemMain}>
                         <Text style={styles.locItemTitle}>{loc.title}</Text>
-                        <Text style={styles.locItemStore} numberOfLines={1}>
-                          {loc.location_name || 'Mapped Coordinate'}
-                        </Text>
+                        <Pressable
+                           style={styles.locItemStoreWrapper}
+                           onPress={() => {
+                             if (loc.latitude && loc.longitude) {
+                               const url = `https://www.google.com/maps/search/?api=1&query=${loc.latitude},${loc.longitude}`;
+                               Linking.openURL(url).catch((err) => alert('Error opening map: ' + err.message));
+                             }
+                           }}
+                         >
+                           <Text style={styles.locItemStore} numberOfLines={1}>
+                             {loc.location_name || 'Mapped Coordinate'}
+                           </Text>
+                           {loc.latitude && loc.longitude && (
+                             <Icons.Compass size={8} color="#10B981" style={{ marginLeft: 2 }} />
+                           )}
+                         </Pressable>
                         <Text style={styles.locItemDate}>
                           {new Date(loc.date).toLocaleDateString('en-US', {
                             month: 'short',
@@ -403,11 +417,28 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#F3F4F6',
   },
-  locItemStore: {
-    fontSize: 11,
-    color: '#9CA3AF',
+  locItemStoreWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginTop: 2,
-    maxWidth: 200,
+    backgroundColor: 'rgba(16, 185, 129, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.12)',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    ...Platform.select({
+      web: {
+        cursor: 'pointer',
+      },
+    }),
+  },
+  locItemStore: {
+    fontSize: 10,
+    color: '#10B981',
+    fontWeight: '600',
+    maxWidth: 180,
   },
   locItemDate: {
     fontSize: 9,

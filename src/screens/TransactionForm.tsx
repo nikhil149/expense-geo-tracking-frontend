@@ -9,6 +9,7 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  Linking,
 } from 'react-native';
 import { useAppStore, Category, Goal } from '../store/useAppStore';
 import { GlassCard } from '../components/GlassCard';
@@ -65,10 +66,13 @@ export const TransactionForm = ({
   const [longitude, setLongitude] = useState<number | null>(null);
   const [locationName, setLocationName] = useState('');
   const [isLocating, setIsLocating] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   // Autocomplete UI state
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [mapSearchQuery, setMapSearchQuery] = useState('');
+  const [mapSuggestions, setMapSuggestions] = useState<any[]>([]);
 
   // Add custom category mini form states
   const [showAddCat, setShowAddCat] = useState(false);
@@ -104,15 +108,106 @@ export const TransactionForm = ({
     }
   }, [transactionId, isEditing, categories]);
 
-  // Handle store names autocomplete matching
-  const handleLocationSearchChange = (query: string) => {
+  // Auto-fetch GPS on form mount for new transactions
+  useEffect(() => {
+    if (!isEditing) {
+      handleFetchGPSLocation();
+    }
+  }, [isEditing]);
+
+  // Handle dedicated Google Maps-style location search
+  const handleMapSearchChange = async (query: string) => {
+    setMapSearchQuery(query);
+    if (query.length > 2) {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=6`,
+          {
+            headers: {
+              'User-Agent': 'ExpenseGeoTrackingApp/1.0',
+            },
+          }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          const formatted = data.map((item: any) => {
+            const addr = item.address;
+            const name = item.name || addr.amenity || addr.shop || addr.building || addr.road || query;
+            const fullLoc = item.display_name;
+            return {
+              name: name,
+              loc: fullLoc,
+              lat: parseFloat(item.lat),
+              lng: parseFloat(item.lon),
+              category: addr.shop || addr.amenity || 'Shopping',
+            };
+          });
+          setMapSuggestions(formatted);
+        }
+      } catch (err) {
+        // Fallback silently
+      }
+    } else {
+      setMapSuggestions([]);
+    }
+  };
+
+  const handleSelectMapSuggestion = (suggestion: any) => {
+    setLocationName(suggestion.loc.split(',').slice(0, 3).join(', '));
+    setLatitude(suggestion.lat);
+    setLongitude(suggestion.lng);
+
+    // Auto populate transaction title if empty
+    if (!title) {
+      setTitle(suggestion.name);
+    }
+
+    // Pre-select category based on location categories
+    const sugCat = (suggestion.category || '').toLowerCase();
+    const matchCat = categories.find((c) => {
+      const catLower = c.name.toLowerCase();
+      return sugCat.includes(catLower) || catLower.includes(sugCat);
+    });
+    if (matchCat) {
+      setCategoryId(matchCat.id);
+    }
+
+    setMapSuggestions([]);
+    setMapSearchQuery('');
+  };
+
+  // Handle store names autocomplete matching via real OSM Nominatim Search API
+  const handleLocationSearchChange = async (query: string) => {
     setSearchQuery(query);
-    if (query.length > 1) {
-      const filtered = MOCK_BUSINESSES.filter(
-        (b) => b.name.toLowerCase().includes(query.toLowerCase()) ||
-               b.loc.toLowerCase().includes(query.toLowerCase())
-      );
-      setSuggestions(filtered);
+    if (query.length > 2) {
+      try {
+        const response = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=6`,
+          {
+            headers: {
+              'User-Agent': 'ExpenseGeoTrackingApp/1.0',
+            },
+          }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          const formatted = data.map((item: any) => {
+            const addr = item.address;
+            const name = item.name || addr.amenity || addr.shop || addr.building || addr.road || query;
+            const fullLoc = item.display_name;
+            return {
+              name: name,
+              loc: fullLoc.split(',').slice(0, 3).join(', '),
+              lat: parseFloat(item.lat),
+              lng: parseFloat(item.lon),
+              category: addr.shop || addr.amenity || 'Shopping',
+            };
+          });
+          setSuggestions(formatted);
+        }
+      } catch (err) {
+        // Fallback silently
+      }
     } else {
       setSuggestions([]);
     }
@@ -127,52 +222,100 @@ export const TransactionForm = ({
     setSearchQuery('');
 
     // Pre-select category based on suggestion
-    const matchCat = categories.find((c) => c.name === suggestion.category);
-    if (matchCat) setCategoryId(matchCat.id);
+    const sugCat = (suggestion.category || '').toLowerCase();
+    const matchCat = categories.find((c) => {
+      const catLower = c.name.toLowerCase();
+      return sugCat.includes(catLower) || catLower.includes(sugCat);
+    });
+    if (matchCat) {
+      setCategoryId(matchCat.id);
+    } else {
+      const nameLower = suggestion.name.toLowerCase();
+      if (nameLower.includes('starbucks') || nameLower.includes('coffee') || nameLower.includes('cafe') || nameLower.includes('food') || nameLower.includes('restaurant')) {
+        const cat = categories.find(c => c.name.toLowerCase().includes('food') || c.name.toLowerCase().includes('dining'));
+        if (cat) setCategoryId(cat.id);
+      } else if (nameLower.includes('gym') || nameLower.includes('fitness') || nameLower.includes('sport')) {
+        const cat = categories.find(c => c.name.toLowerCase().includes('health') || c.name.toLowerCase().includes('gym') || c.name.toLowerCase().includes('fitness'));
+        if (cat) setCategoryId(cat.id);
+      } else if (nameLower.includes('fuel') || nameLower.includes('gas') || nameLower.includes('station') || nameLower.includes('chevron') || nameLower.includes('shell')) {
+        const cat = categories.find(c => c.name.toLowerCase().includes('transport') || c.name.toLowerCase().includes('car'));
+        if (cat) setCategoryId(cat.id);
+      } else if (nameLower.includes('shop') || nameLower.includes('store') || nameLower.includes('mall') || nameLower.includes('grocery') || nameLower.includes('supermarket')) {
+        const cat = categories.find(c => c.name.toLowerCase().includes('shop'));
+        if (cat) setCategoryId(cat.id);
+      }
+    }
   };
 
-  // Taps Device GPS button: calls native Location module
+  // Taps Device GPS button: calls native Location module & does reverse-geocoding
   const handleFetchGPSLocation = async () => {
     setIsLocating(true);
     setFormError(null);
     try {
+      let lat: number | null = null;
+      let lng: number | null = null;
+
       if (Platform.OS === 'web') {
-        // Standard Web Geolocation API
         if ('geolocation' in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => {
-              setLatitude(pos.coords.latitude);
-              setLongitude(pos.coords.longitude);
-              setLocationName('My GPS Location');
-              setIsLocating(false);
-            },
-            (err) => {
-              setFormError(`GPS permission denied or timeout: ${err.message}`);
-              setIsLocating(false);
-            }
-          );
+          const posPromise = new Promise<GeolocationPosition>((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 8000 });
+          });
+          const pos = await posPromise;
+          lat = pos.coords.latitude;
+          lng = pos.coords.longitude;
         } else {
-          setFormError('Web GPS is not supported in this browser.');
-          setIsLocating(false);
+          throw new Error('Web Geolocation is not supported by your browser.');
         }
       } else {
-        // Native Expo Location module
         const Location = require('expo-location');
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          setFormError('Permission to access device GPS location was denied.');
-          setIsLocating(false);
-          return;
+          throw new Error('GPS permission denied.');
         }
-
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        setLatitude(loc.coords.latitude);
-        setLongitude(loc.coords.longitude);
-        setLocationName('Current Mobile Location');
-        setIsLocating(false);
+        lat = loc.coords.latitude;
+        lng = loc.coords.longitude;
+      }
+
+      if (lat && lng) {
+        setLatitude(lat);
+        setLongitude(lng);
+        setUserLocation({ latitude: lat, longitude: lng });
+
+        // Reverse-geocoding using OSM Nominatim API
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`,
+            {
+              headers: {
+                'User-Agent': 'ExpenseGeoTrackingApp/1.0',
+              },
+            }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.display_name) {
+              const addr = data.address;
+              const shortAddr = addr
+                ? [addr.amenity || addr.shop || addr.building, addr.road, addr.suburb || addr.neighbourhood, addr.city || addr.town]
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .join(', ') || data.display_name.split(',').slice(0, 2).join(',')
+                : data.display_name.split(',').slice(0, 2).join(',');
+              setLocationName(shortAddr);
+            } else {
+              setLocationName('My GPS Location');
+            }
+          } else {
+            setLocationName('My GPS Location');
+          }
+        } catch (e) {
+          setLocationName('My GPS Location');
+        }
       }
     } catch (err: any) {
-      setFormError(`Failed to fetch location: ${err.message}`);
+      setFormError(`GPS failed: ${err.message}`);
+    } finally {
       setIsLocating(false);
     }
   };
@@ -491,8 +634,58 @@ export const TransactionForm = ({
           </View>
         </View>
 
+        {latitude && longitude && (
+          <Pressable
+            style={styles.googleMapsBtn}
+            onPress={() => {
+              const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+              Linking.openURL(url).catch((err) => alert('Error opening map: ' + err.message));
+            }}
+          >
+            <Icons.Compass size={14} color="#10B981" />
+            <Text style={styles.googleMapsBtnText}>Open in Google Maps</Text>
+          </Pressable>
+        )}
+
+        {/* Dedicated Google Maps-style Search Bar */}
+        <Text style={[styles.inputLabel, { marginTop: 4 }]}>Search Map Location (Google Maps style)</Text>
+        <View style={styles.mapSearchWrapper}>
+          <View style={styles.mapSearchBox}>
+            <Icons.Search size={14} color="#6B7280" style={{ marginRight: 8 }} />
+            <TextInput
+              placeholder="Search place, city, landmark to center map..."
+              placeholderTextColor="#6B7280"
+              value={mapSearchQuery}
+              onChangeText={handleMapSearchChange}
+              style={styles.mapSearchInput}
+            />
+            {mapSearchQuery ? (
+              <Pressable onPress={() => { setMapSearchQuery(''); setMapSuggestions([]); }}>
+                <Icons.X size={14} color="#6B7280" />
+              </Pressable>
+            ) : null}
+          </View>
+          {mapSuggestions.length > 0 && (
+            <View style={styles.mapSuggestionsCard}>
+              {mapSuggestions.map((item, idx) => (
+                <Pressable
+                  key={idx}
+                  style={styles.mapSuggestionItem}
+                  onPress={() => handleSelectMapSuggestion(item)}
+                >
+                  <Icons.MapPin size={12} color="#8B5CF6" style={{ marginRight: 8, marginTop: 2 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.suggestionName}>{item.name}</Text>
+                    <Text style={styles.suggestionLoc} numberOfLines={1}>{item.loc}</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+
         {/* Interactive Map Pin Dropper Embedded Selector */}
-        <Text style={[styles.inputLabel, { marginTop: 4 }]}>
+        <Text style={[styles.inputLabel, { marginTop: 8 }]}>
           Manual Pin Placement (Tap map below to drop coordinate marker)
         </Text>
         <View style={styles.embeddedMapWrapper}>
@@ -501,6 +694,7 @@ export const TransactionForm = ({
             interactive={true}
             onPinSelect={handleMapPinDrop}
             selectedPin={latitude && longitude ? { latitude, longitude } : null}
+            userLocation={userLocation}
           />
         </View>
 
@@ -836,5 +1030,78 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
     fontSize: 14,
+  },
+  googleMapsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginBottom: 16,
+    gap: 6,
+    ...Platform.select({
+      web: {
+        cursor: 'pointer',
+      },
+    }),
+  },
+  googleMapsBtnText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  mapSearchWrapper: {
+    position: 'relative',
+    zIndex: 30,
+    marginBottom: 12,
+  },
+  mapSearchBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 40,
+  },
+  mapSearchInput: {
+    flex: 1,
+    color: '#FFFFFF',
+    fontSize: 13,
+    height: '100%',
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none' as any,
+      },
+    }),
+  },
+  mapSuggestionsCard: {
+    position: 'absolute',
+    top: 42,
+    left: 0,
+    right: 0,
+    backgroundColor: '#111827',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 10,
+    zIndex: 100,
+    maxHeight: 180,
+    overflow: 'scroll',
+  },
+  mapSuggestionItem: {
+    flexDirection: 'row',
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+    ...Platform.select({
+      web: {
+        cursor: 'pointer',
+      },
+    }),
   },
 });

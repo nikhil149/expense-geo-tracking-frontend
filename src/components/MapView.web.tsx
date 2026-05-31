@@ -19,6 +19,7 @@ interface MapViewProps {
   onPinSelect?: (coords: { latitude: number; longitude: number; location_name?: string }) => void;
   interactive?: boolean;
   selectedPin?: { latitude: number; longitude: number } | null;
+  userLocation?: { latitude: number; longitude: number } | null;
 }
 
 export const MapView = ({
@@ -26,6 +27,7 @@ export const MapView = ({
   onPinSelect,
   interactive = false,
   selectedPin = null,
+  userLocation = null,
 }: MapViewProps) => {
   const iframeRef = useRef<any>(null);
 
@@ -59,6 +61,7 @@ export const MapView = ({
             locations: validLocations,
             interactive,
             selectedPin,
+            userLocation,
           },
           '*'
         );
@@ -69,10 +72,10 @@ export const MapView = ({
 
     const timer = setTimeout(updateIframe, 400);
     return () => clearTimeout(timer);
-  }, [validLocations, interactive, selectedPin]);
+  }, [validLocations, interactive, selectedPin, userLocation]);
 
-  const baseLat = selectedPin?.latitude || (validLocations.length > 0 ? validLocations[0].latitude : 37.7749);
-  const baseLng = selectedPin?.longitude || (validLocations.length > 0 ? validLocations[0].longitude : -122.4194);
+  const baseLat = selectedPin?.latitude || userLocation?.latitude || (validLocations.length > 0 ? validLocations[0].latitude : 37.7749);
+  const baseLng = selectedPin?.longitude || userLocation?.longitude || (validLocations.length > 0 ? validLocations[0].longitude : -122.4194);
   
   const srcDocContent = `
     <!DOCTYPE html>
@@ -99,6 +102,21 @@ export const MapView = ({
         .popup-amount { font-size: 15px; font-weight: 800; }
         .popup-type { font-size: 9px; padding: 1px 6px; border-radius: 4px; font-weight: bold; text-transform: uppercase; }
         .popup-loc { font-size: 10px; color: #9CA3AF; margin-top: 1px; }
+        
+        @keyframes userPulse {
+          0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+          70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+        .user-location-pulse {
+          background-color: #3B82F6;
+          width: 12px;
+          height: 12px;
+          border-radius: 50%;
+          border: 2px solid white;
+          box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+          animation: userPulse 2s infinite;
+        }
       </style>
     </head>
     <body>
@@ -114,8 +132,9 @@ export const MapView = ({
 
         let markerGroup = L.layerGroup().addTo(map);
         let interactionMarker = null;
+        let userLocMarker = null;
 
-        function renderMarkers(locations, interactiveMode, selPin) {
+        function renderMarkers(locations, interactiveMode, selPin, uLoc) {
           markerGroup.clearLayers();
 
           locations.forEach(loc => {
@@ -149,7 +168,7 @@ export const MapView = ({
           if (selPin) {
             const selIcon = L.divIcon({
               className: 'selected-div-icon',
-              html: '<div style="background-color: #8B5CF6; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 12px #8B5CF6; animation: pulse 1.5s infinite;"></div>',
+              html: '<div style="background-color: #8B5CF6; width: 18px; height: 18px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 12px #8B5CF6;"></div>',
               iconSize: [24, 24],
               iconAnchor: [12, 12]
             });
@@ -158,11 +177,35 @@ export const MapView = ({
               map.removeLayer(interactionMarker);
             }
             interactionMarker = L.marker([selPin.latitude, selPin.longitude], { icon: selIcon }).addTo(map);
-            map.panTo([selPin.latitude, selPin.longitude]);
+            map.flyTo([selPin.latitude, selPin.longitude], 15, { animate: true, duration: 1.5 });
+          } else if (interactionMarker) {
+            map.removeLayer(interactionMarker);
+            interactionMarker = null;
+          }
+
+          if (uLoc) {
+            const uLocIcon = L.divIcon({
+              className: 'user-loc-div-icon',
+              html: '<div class="user-location-pulse"></div>',
+              iconSize: [16, 16],
+              iconAnchor: [8, 8]
+            });
+
+            if (userLocMarker) {
+              map.removeLayer(userLocMarker);
+            }
+            userLocMarker = L.marker([uLoc.latitude, uLoc.longitude], { icon: uLocIcon }).addTo(map);
+            
+            if (!selPin && locations.length === 0) {
+              map.flyTo([uLoc.latitude, uLoc.longitude], 15, { animate: true, duration: 1.5 });
+            }
+          } else if (userLocMarker) {
+            map.removeLayer(userLocMarker);
+            userLocMarker = null;
           }
         }
 
-        renderMarkers(${JSON.stringify(validLocations)}, ${interactive}, ${selectedPin ? JSON.stringify(selectedPin) : 'null'});
+        renderMarkers(${JSON.stringify(validLocations)}, ${interactive}, ${selectedPin ? JSON.stringify(selectedPin) : 'null'}, ${userLocation ? JSON.stringify(userLocation) : 'null'});
 
         map.on('click', function(e) {
           window.parent.postMessage({
@@ -174,7 +217,7 @@ export const MapView = ({
 
         window.addEventListener('message', function(event) {
           if (event.data && event.data.type === 'UPDATE_MARKERS') {
-            renderMarkers(event.data.locations, event.data.interactive, event.data.selectedPin);
+            renderMarkers(event.data.locations, event.data.interactive, event.data.selectedPin, event.data.userLocation);
           }
         });
       </script>

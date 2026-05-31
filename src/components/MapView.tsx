@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useEffect, useRef } from 'react';
 import { StyleSheet } from 'react-native';
 import NativeMap, { Marker as NativeMarker } from 'react-native-maps';
 
@@ -19,6 +20,7 @@ interface MapViewProps {
   onPinSelect?: (coords: { latitude: number; longitude: number; location_name?: string }) => void;
   interactive?: boolean;
   selectedPin?: { latitude: number; longitude: number } | null;
+  userLocation?: { latitude: number; longitude: number } | null;
 }
 
 export const MapView = ({
@@ -26,8 +28,28 @@ export const MapView = ({
   onPinSelect,
   interactive = false,
   selectedPin = null,
+  userLocation = null,
 }: MapViewProps) => {
   const validLocations = locations.filter((loc: MapLocation) => loc.latitude && loc.longitude);
+  const mapRef = useRef<NativeMap>(null);
+
+  useEffect(() => {
+    if (selectedPin && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: selectedPin.latitude,
+        longitude: selectedPin.longitude,
+        latitudeDelta: 0.015,
+        longitudeDelta: 0.015,
+      }, 1000);
+    } else if (userLocation && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        latitudeDelta: 0.015,
+        longitudeDelta: 0.015,
+      }, 1000);
+    }
+  }, [selectedPin, userLocation]);
 
   const initialRegion = selectedPin
     ? {
@@ -51,10 +73,13 @@ export const MapView = ({
 
   return (
     <NativeMap
+      ref={mapRef}
       style={styles.nativeMap}
       initialRegion={initialRegion}
       customMapStyle={darkMapStyle}
       onPress={handlePress}
+      showsUserLocation={true}
+      showsMyLocationButton={true}
     >
       {validLocations.map((loc: MapLocation) => (
         <NativeMarker

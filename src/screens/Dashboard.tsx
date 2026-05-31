@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   TextInput,
   Platform,
+  Linking,
 } from 'react-native';
 import { useAppStore } from '../store/useAppStore';
 import { GlassCard } from '../components/GlassCard';
@@ -466,12 +467,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     
                     {/* Location tag with Pin icon */}
                     {tx.location_name && (
-                      <View style={styles.locationTag}>
-                        <Icons.MapPin size={10} color="#9CA3AF" />
-                        <Text style={styles.locationTagText} numberOfLines={1}>
-                          {tx.location_name}
-                        </Text>
-                      </View>
+                      tx.latitude && tx.longitude ? (
+                        <Pressable
+                          style={styles.locationTagPressable}
+                          onPress={() => {
+                            const url = `https://www.google.com/maps/search/?api=1&query=${tx.latitude},${tx.longitude}`;
+                            Linking.openURL(url).catch((err) => alert('Error opening map: ' + err.message));
+                          }}
+                        >
+                          <Icons.MapPin size={10} color="#10B981" />
+                          <Text style={styles.locationTagTextPressable} numberOfLines={1}>
+                            {tx.location_name}
+                          </Text>
+                          <Icons.Compass size={9} color="#10B981" style={{ marginLeft: 3 }} />
+                        </Pressable>
+                      ) : (
+                        <View style={styles.locationTag}>
+                          <Icons.MapPin size={10} color="#9CA3AF" />
+                          <Text style={styles.locationTagText} numberOfLines={1}>
+                            {tx.location_name}
+                          </Text>
+                        </View>
+                      )
                     )}
                     <Text style={styles.txDate}>
                       {new Date(tx.date).toLocaleDateString('en-US', {
@@ -871,6 +888,30 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     fontWeight: '400',
     maxWidth: 160,
+  },
+  locationTagPressable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 3,
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    ...Platform.select({
+      web: {
+        cursor: 'pointer',
+      },
+    }),
+  },
+  locationTagTextPressable: {
+    fontSize: 10,
+    color: '#10B981',
+    fontWeight: '700',
+    maxWidth: 140,
   },
   txDate: {
     fontSize: 10,
