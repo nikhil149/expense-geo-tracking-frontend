@@ -196,8 +196,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
       await createTransaction({
         title: parsed.title,
         amount: parsed.amount,
-        type: parsed.type, // expense
-        date: new Date().toISOString(),
+        type: parsed.type,
+        date: parsed.date || new Date().toISOString(),
         category_id: matchedCategoryId,
         latitude,
         longitude,
