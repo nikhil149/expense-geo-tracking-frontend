@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# Google Play Store credentials (NEVER commit)
+google-play-service-account.json

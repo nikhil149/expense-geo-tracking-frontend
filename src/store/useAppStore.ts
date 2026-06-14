@@ -1,12 +1,17 @@
 import { create } from 'zustand';
 import { Platform } from 'react-native';
 
-// Dynamically resolve API URL depending on host platform
-export const API_BASE_URL = Platform.select({
-  android: 'http://192.168.100.40:5001/api',
-  ios: 'http://localhost:5001/api',
-  default: 'http://localhost:5001/api', // handles web and others
-});
+// Dynamically resolve API URL depending on host platform and environment
+// TODO: Replace <YOUR_CLOUDFRONT_DOMAIN> with your actual CloudFront distribution domain
+// after completing AWS setup (Part 2.8 of the deployment plan).
+// Example: 'https://d1abc2def3ghij.cloudfront.net/api'
+export const API_BASE_URL = __DEV__
+  ? Platform.select({
+    android: 'http://[IP_ADDRESS]/api',
+    ios: 'http://[IP_ADDRESS]/api',
+    default: 'http://[IP_ADDRESS]/api', // handles web and others
+  })
+  : 'https://d29xz5ma6wsmg7.cloudfront.net/api';
 
 export interface User {
   id: number;
