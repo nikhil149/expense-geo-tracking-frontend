@@ -97,6 +97,7 @@ interface AppStoreState {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   initializeAuth: () => Promise<void>;
 
   setMapFilters: (filters: Partial<MapFilters>) => void;
@@ -275,6 +276,31 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         netSavings: 0,
       }
     });
+  },
+
+  deleteAccount: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const { token } = get();
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete account');
+      }
+
+      await get().logout();
+    } catch (err: any) {
+      set({ error: err.message, isLoading: false });
+      throw err;
+    }
   },
 
   setMapFilters: (filters) => {

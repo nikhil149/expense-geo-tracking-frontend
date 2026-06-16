@@ -9,6 +9,7 @@ import {
   TextInput,
   Platform,
   Linking,
+  Alert,
 } from 'react-native';
 import { useAppStore } from '../store/useAppStore';
 import { GlassCard } from '../components/GlassCard';
@@ -82,6 +83,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     loadAllData,
     deleteTransaction,
     createTransaction,
+    deleteAccount,
   } = useAppStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -108,6 +110,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const handleDelete = async (id: number) => {
     if (confirm('Are you sure you want to delete this transaction?')) {
       await deleteTransaction(id);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('WARNING: This will permanently delete your account and all data. Are you sure?')) {
+        deleteAccount();
+      }
+    } else {
+      Alert.alert(
+        'Delete Account',
+        'WARNING: This will permanently delete your account and all your transactions. This cannot be undone. Are you sure?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete Permanently', style: 'destructive', onPress: deleteAccount }
+        ]
+      );
     }
   };
 
@@ -249,7 +268,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <Icons.RotateCw size={18} color="#9CA3AF" />
             </Pressable>
             <Pressable style={[styles.refreshBtn, { marginLeft: 8 }]} onPress={logout}>
-              <Icons.LogOut size={18} color="#EF4444" />
+              <Icons.LogOut size={18} color="#9CA3AF" />
+            </Pressable>
+            <Pressable style={[styles.refreshBtn, { marginLeft: 8, borderColor: 'rgba(239, 68, 68, 0.3)', backgroundColor: 'rgba(239, 68, 68, 0.1)' }]} onPress={handleDeleteAccount}>
+              <Icons.UserMinus size={18} color="#EF4444" />
             </Pressable>
           </View>
         </View>

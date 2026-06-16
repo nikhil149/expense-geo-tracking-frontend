@@ -1,0 +1,52 @@
+name: Build & Submit to Play Store (Internal)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-submit:
+    name: EAS Build → Internal Testing
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ──
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── 2. Setup Node.js ──
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # ── 3. Install dependencies ──
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 4. Setup EAS CLI ──
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # ── 5. Decode Google Play service account key ──
+      - name: Decode service account key
+        run: |
+          echo "${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_KEY_BASE64 }}" \
+            | base64 --decode > google-play-service-account.json
+
+      # ── 6. Build Android App Bundle ──
+      - name: Build Android .aab
+        run: eas build --platform android --profile production --non-interactive
+
+      # ── 7. Submit to Google Play Store (Internal Testing) ──
+      - name: Submit to Play Store (Internal Testing)
+        run: eas submit --platform android --profile production --latest --non-interactive
+
+      # ── 8. Cleanup credentials ──
+      - name: Cleanup credentials
+        if: always()
+        run: rm -f google-play-service-account.json
