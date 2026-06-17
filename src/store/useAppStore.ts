@@ -127,15 +127,14 @@ interface AppStoreState {
   loadAllData: () => Promise<void>;
 }
 
-// In-memory token cache for native mobile environments
-const nativeTokenCache: Record<string, string> = {};
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const getStorageItem = async (key: string): Promise<string | null> => {
   try {
     if (Platform.OS === 'web') {
       return localStorage.getItem(key);
     } else {
-      return nativeTokenCache[key] || null;
+      return await AsyncStorage.getItem(key);
     }
   } catch (e) {
     return null;
@@ -148,8 +147,8 @@ const setStorageItem = async (key: string, value: string | null): Promise<void> 
       if (value) localStorage.setItem(key, value);
       else localStorage.removeItem(key);
     } else {
-      if (value) nativeTokenCache[key] = value;
-      else delete nativeTokenCache[key];
+      if (value) await AsyncStorage.setItem(key, value);
+      else await AsyncStorage.removeItem(key);
     }
   } catch (e) { }
 };

@@ -40,7 +40,13 @@
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Geo-Finance to use your location to tag your expenses."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
