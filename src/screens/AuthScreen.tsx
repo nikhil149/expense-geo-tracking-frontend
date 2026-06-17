@@ -15,46 +15,133 @@ import { GlassCard } from '../components/GlassCard';
 import * as LucideIcons from 'lucide-react-native';
 const Icons = LucideIcons as any;
 
-export const AuthScreen: React.FC = () => {
-  const { login, register, isLoading, error } = useAppStore();
+type AuthMode = 'login' | 'register' | 'forgot' | 'verify' | 'resetPassword';
 
-  const [isLogin, setIsLogin] = useState(true);
+export const AuthScreen: React.FC = () => {
+  const { login, register, forgotPassword, verifyCode, resetPassword, isLoading, error } = useAppStore();
+
+  const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [code, setCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const handleSubmit = async () => {
+  const clearState = () => {
     setLocalError(null);
+    setSuccessMsg(null);
+  };
+
+  const handleLoginSubmit = async () => {
+    clearState();
     if (!email || !password) {
       setLocalError('Please fill in email and password.');
       return;
     }
-    if (!isLogin && !name) {
-      setLocalError('Please fill in your name.');
+    try {
+      await login(email, password);
+    } catch (err: any) { /* handled by store */ }
+  };
+
+  const handleRegisterSubmit = async () => {
+    clearState();
+    if (!email || !password || !name) {
+      setLocalError('Please fill in all fields.');
       return;
     }
-
     try {
-      if (isLogin) {
-        await login(email, password);
-      } else {
-        await register(email, password, name);
-      }
+      await register(email, password, name);
+    } catch (err: any) { /* handled by store */ }
+  };
+
+  const handleForgotSubmit = async () => {
+    clearState();
+    if (!email) {
+      setLocalError('Please enter your email address.');
+      return;
+    }
+    try {
+      const msg = await forgotPassword(email);
+      setSuccessMsg('Verification code sent! Check your email.');
+      setMode('verify');
     } catch (err: any) {
-      // Handled by store, but we can log it here
+      setLocalError(err.message);
     }
   };
 
-  const toggleMode = () => {
-    setIsLogin(!isLogin);
-    setLocalError(null);
-    setEmail('');
-    setPassword('');
-    setName('');
+  const handleVerifySubmit = async () => {
+    clearState();
+    if (!code || code.length !== 6) {
+      setLocalError('Please enter the 6-digit code.');
+      return;
+    }
+    try {
+      await verifyCode(email, code);
+      setSuccessMsg('Code verified! Set your new password.');
+      setMode('resetPassword');
+    } catch (err: any) {
+      setLocalError(err.message);
+    }
+  };
+
+  const handleResetSubmit = async () => {
+    clearState();
+    if (!newPassword || !confirmPassword) {
+      setLocalError('Please fill in both password fields.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setLocalError('Password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setLocalError('Passwords do not match.');
+      return;
+    }
+    try {
+      await resetPassword(email, code, newPassword);
+      setSuccessMsg('Password reset successfully! You can now log in.');
+      setMode('login');
+      setPassword('');
+      setCode('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      setLocalError(err.message);
+    }
+  };
+
+  const switchTo = (target: AuthMode) => {
+    setMode(target);
+    clearState();
+    if (target === 'login' || target === 'register') {
+      setCode('');
+      setNewPassword('');
+      setConfirmPassword('');
+    }
   };
 
   const activeError = error || localError;
+
+  // Card titles and subtitles per mode
+  const titles: Record<AuthMode, string> = {
+    login: 'Sign In to Hub',
+    register: 'Register Account',
+    forgot: 'Forgot Password',
+    verify: 'Enter Verification Code',
+    resetPassword: 'Set New Password',
+  };
+
+  const subtitles: Record<AuthMode, string> = {
+    login: 'Welcome back! Log in to view your ledger.',
+    register: 'Join and start tracking geospatial transactions.',
+    forgot: 'Enter your email to receive a 6-digit verification code.',
+    verify: `We sent a code to ${email}. Enter it below.`,
+    resetPassword: 'Choose a strong new password for your account.',
+  };
 
   return (
     <KeyboardAvoidingView
@@ -67,19 +154,24 @@ export const AuthScreen: React.FC = () => {
           <View style={styles.logoBox}>
             <Icons.TrendingUp size={32} color="#8B5CF6" />
           </View>
-          <Text style={styles.brandName}>ANTIGRAVITY</Text>
+          <Text style={styles.brandName}>GEO-FINANCE</Text>
           <Text style={styles.brandSub}>Geo-Finance & Investment Auditor</Text>
         </View>
 
         {/* Auth Glass Card */}
         <GlassCard style={styles.card}>
-          <Text style={styles.cardTitle}>
-            {isLogin ? 'Sign In to Hub' : 'Register Account'}
-          </Text>
-          <Text style={styles.cardSubtitle}>
-            {isLogin ? 'Welcome back! Log in to view your ledger.' : 'Join and start tracking geospatial transactions.'}
-          </Text>
+          <Text style={styles.cardTitle}>{titles[mode]}</Text>
+          <Text style={styles.cardSubtitle}>{subtitles[mode]}</Text>
 
+          {/* Success message */}
+          {successMsg && (
+            <View style={styles.successContainer}>
+              <Icons.CheckCircle size={16} color="#10B981" style={styles.errorIcon} />
+              <Text style={styles.successText}>{successMsg}</Text>
+            </View>
+          )}
+
+          {/* Error message */}
           {activeError && (
             <View style={styles.errorContainer}>
               <Icons.AlertCircle size={16} color="#EF4444" style={styles.errorIcon} />
@@ -88,88 +180,291 @@ export const AuthScreen: React.FC = () => {
           )}
 
           <View style={styles.form}>
-            {!isLogin && (
-              <View style={styles.inputWrapper}>
-                <Text style={styles.label}>Full Name</Text>
-                <View style={styles.inputContainer}>
-                  <Icons.User size={18} color="#9CA3AF" style={styles.inputIcon} />
-                  <TextInput
-                    placeholder="Nikhil Rachawar"
-                    placeholderTextColor="#6B7280"
-                    value={name}
-                    onChangeText={setName}
-                    style={styles.input}
-                    autoCapitalize="words"
-                  />
+            {/* --- LOGIN MODE --- */}
+            {mode === 'login' && (
+              <>
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.label}>Email Address</Text>
+                  <View style={styles.inputContainer}>
+                    <Icons.Mail size={18} color="#9CA3AF" style={styles.inputIcon} />
+                    <TextInput
+                      placeholder="nikhil@example.com"
+                      placeholderTextColor="#6B7280"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      style={styles.input}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
                 </View>
-              </View>
+
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.label}>Password</Text>
+                  <View style={styles.inputContainer}>
+                    <Icons.Lock size={18} color="#9CA3AF" style={styles.inputIcon} />
+                    <TextInput
+                      placeholder="••••••••"
+                      placeholderTextColor="#6B7280"
+                      secureTextEntry
+                      value={password}
+                      onChangeText={setPassword}
+                      style={styles.input}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                </View>
+
+                {/* Forgot Password Link */}
+                <Pressable onPress={() => switchTo('forgot')} style={styles.forgotBtn}>
+                  <Text style={styles.forgotBtnText}>Forgot Password?</Text>
+                </Pressable>
+
+                <Pressable
+                  style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.8 }]}
+                  onPress={handleLoginSubmit}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Text style={styles.submitBtnText}>Authenticate</Text>
+                      <Icons.ArrowRight size={16} color="#FFFFFF" />
+                    </>
+                  )}
+                </Pressable>
+              </>
             )}
 
-            <View style={styles.inputWrapper}>
-              <Text style={styles.label}>Email Address</Text>
-              <View style={styles.inputContainer}>
-                <Icons.Mail size={18} color="#9CA3AF" style={styles.inputIcon} />
-                <TextInput
-                  placeholder="nikhil@example.com"
-                  placeholderTextColor="#6B7280"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  style={styles.input}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
+            {/* --- REGISTER MODE --- */}
+            {mode === 'register' && (
+              <>
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.label}>Full Name</Text>
+                  <View style={styles.inputContainer}>
+                    <Icons.User size={18} color="#9CA3AF" style={styles.inputIcon} />
+                    <TextInput
+                      placeholder="Nikhil Rachawar"
+                      placeholderTextColor="#6B7280"
+                      value={name}
+                      onChangeText={setName}
+                      style={styles.input}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                </View>
 
-            <View style={styles.inputWrapper}>
-              <Text style={styles.label}>Password</Text>
-              <View style={styles.inputContainer}>
-                <Icons.Lock size={18} color="#9CA3AF" style={styles.inputIcon} />
-                <TextInput
-                  placeholder="••••••••"
-                  placeholderTextColor="#6B7280"
-                  secureTextEntry
-                  value={password}
-                  onChangeText={setPassword}
-                  style={styles.input}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.label}>Email Address</Text>
+                  <View style={styles.inputContainer}>
+                    <Icons.Mail size={18} color="#9CA3AF" style={styles.inputIcon} />
+                    <TextInput
+                      placeholder="nikhil@example.com"
+                      placeholderTextColor="#6B7280"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      style={styles.input}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                </View>
 
-            <Pressable
-              style={({ pressed }) => [
-                styles.submitBtn,
-                pressed && { opacity: 0.8 }
-              ]}
-              onPress={handleSubmit}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Text style={styles.submitBtnText}>
-                    {isLogin ? 'Authenticate' : 'Get Started'}
-                  </Text>
-                  <Icons.ArrowRight size={16} color="#FFFFFF" />
-                </>
-              )}
-            </Pressable>
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.label}>Password</Text>
+                  <View style={styles.inputContainer}>
+                    <Icons.Lock size={18} color="#9CA3AF" style={styles.inputIcon} />
+                    <TextInput
+                      placeholder="••••••••"
+                      placeholderTextColor="#6B7280"
+                      secureTextEntry
+                      value={password}
+                      onChangeText={setPassword}
+                      style={styles.input}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                </View>
+
+                <Pressable
+                  style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.8 }]}
+                  onPress={handleRegisterSubmit}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Text style={styles.submitBtnText}>Get Started</Text>
+                      <Icons.ArrowRight size={16} color="#FFFFFF" />
+                    </>
+                  )}
+                </Pressable>
+              </>
+            )}
+
+            {/* --- FORGOT PASSWORD MODE --- */}
+            {mode === 'forgot' && (
+              <>
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.label}>Email Address</Text>
+                  <View style={styles.inputContainer}>
+                    <Icons.Mail size={18} color="#9CA3AF" style={styles.inputIcon} />
+                    <TextInput
+                      placeholder="nikhil@example.com"
+                      placeholderTextColor="#6B7280"
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      style={styles.input}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                </View>
+
+                <Pressable
+                  style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.8 }]}
+                  onPress={handleForgotSubmit}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Icons.Send size={16} color="#FFFFFF" />
+                      <Text style={styles.submitBtnText}>Send Verification Code</Text>
+                    </>
+                  )}
+                </Pressable>
+              </>
+            )}
+
+            {/* --- VERIFY CODE MODE --- */}
+            {mode === 'verify' && (
+              <>
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.label}>6-Digit Verification Code</Text>
+                  <View style={styles.inputContainer}>
+                    <Icons.KeyRound size={18} color="#9CA3AF" style={styles.inputIcon} />
+                    <TextInput
+                      placeholder="123456"
+                      placeholderTextColor="#6B7280"
+                      value={code}
+                      onChangeText={(text) => setCode(text.replace(/[^0-9]/g, '').slice(0, 6))}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      style={[styles.input, { letterSpacing: 6, fontSize: 20, fontWeight: '700' }]}
+                    />
+                  </View>
+                </View>
+
+                <Pressable
+                  style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.8 }]}
+                  onPress={handleVerifySubmit}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Icons.ShieldCheck size={16} color="#FFFFFF" />
+                      <Text style={styles.submitBtnText}>Verify Code</Text>
+                    </>
+                  )}
+                </Pressable>
+
+                <Pressable onPress={handleForgotSubmit} style={styles.resendBtn}>
+                  <Text style={styles.resendBtnText}>Didn't receive it? Resend Code</Text>
+                </Pressable>
+              </>
+            )}
+
+            {/* --- RESET PASSWORD MODE --- */}
+            {mode === 'resetPassword' && (
+              <>
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.label}>New Password</Text>
+                  <View style={styles.inputContainer}>
+                    <Icons.Lock size={18} color="#9CA3AF" style={styles.inputIcon} />
+                    <TextInput
+                      placeholder="••••••••"
+                      placeholderTextColor="#6B7280"
+                      secureTextEntry
+                      value={newPassword}
+                      onChangeText={setNewPassword}
+                      style={styles.input}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.inputWrapper}>
+                  <Text style={styles.label}>Confirm New Password</Text>
+                  <View style={styles.inputContainer}>
+                    <Icons.LockKeyhole size={18} color="#9CA3AF" style={styles.inputIcon} />
+                    <TextInput
+                      placeholder="••••••••"
+                      placeholderTextColor="#6B7280"
+                      secureTextEntry
+                      value={confirmPassword}
+                      onChangeText={setConfirmPassword}
+                      style={styles.input}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+                </View>
+
+                <Pressable
+                  style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.8 }]}
+                  onPress={handleResetSubmit}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Icons.Save size={16} color="#FFFFFF" />
+                      <Text style={styles.submitBtnText}>Reset Password</Text>
+                    </>
+                  )}
+                </Pressable>
+              </>
+            )}
           </View>
         </GlassCard>
 
-        {/* Toggle Footer button */}
-        <Pressable style={styles.toggleFooter} onPress={toggleMode}>
-          <Text style={styles.toggleText}>
-            {isLogin ? "Don't have an account? " : "Already registered? "}
-            <Text style={styles.toggleTextHighlight}>
-              {isLogin ? 'Sign Up' : 'Log In'}
+        {/* Toggle Footer */}
+        {(mode === 'login' || mode === 'register') && (
+          <Pressable
+            style={styles.toggleFooter}
+            onPress={() => switchTo(mode === 'login' ? 'register' : 'login')}
+          >
+            <Text style={styles.toggleText}>
+              {mode === 'login' ? "Don't have an account? " : "Already registered? "}
+              <Text style={styles.toggleTextHighlight}>
+                {mode === 'login' ? 'Sign Up' : 'Log In'}
+              </Text>
             </Text>
-          </Text>
-        </Pressable>
+          </Pressable>
+        )}
+
+        {/* Back to Login from forgot/verify/reset screens */}
+        {(mode === 'forgot' || mode === 'verify' || mode === 'resetPassword') && (
+          <Pressable style={styles.toggleFooter} onPress={() => switchTo('login')}>
+            <Text style={styles.toggleText}>
+              Remember your password?{' '}
+              <Text style={styles.toggleTextHighlight}>Back to Login</Text>
+            </Text>
+          </Pressable>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -233,6 +528,23 @@ const styles = StyleSheet.create({
     marginTop: 6,
     lineHeight: 18,
   },
+  successContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 16,
+    gap: 8,
+  },
+  successText: {
+    flex: 1,
+    color: '#6EE7B7',
+    fontSize: 12,
+    fontWeight: '500',
+  },
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -288,6 +600,30 @@ const styles = StyleSheet.create({
         outlineStyle: 'none' as any,
       },
     }),
+  },
+  forgotBtn: {
+    alignSelf: 'flex-end',
+    marginTop: -8,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
+  },
+  forgotBtnText: {
+    color: '#8B5CF6',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  resendBtn: {
+    alignSelf: 'center',
+    marginTop: -4,
+    ...Platform.select({
+      web: { cursor: 'pointer' },
+    }),
+  },
+  resendBtnText: {
+    color: '#9CA3AF',
+    fontSize: 12,
+    fontWeight: '500',
   },
   submitBtn: {
     flexDirection: 'row',

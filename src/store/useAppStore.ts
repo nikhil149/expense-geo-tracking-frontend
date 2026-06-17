@@ -7,9 +7,9 @@ import { Platform } from 'react-native';
 // Example: 'https://d1abc2def3ghij.cloudfront.net/api'
 export const API_BASE_URL = __DEV__
   ? Platform.select({
-    android: 'http://[IP_ADDRESS]/api',
-    ios: 'http://[IP_ADDRESS]/api',
-    default: 'http://[IP_ADDRESS]/api', // handles web and others
+    android: 'http://10.0.2.2:5001/api',
+    ios: 'http://192.168.100.22:5001/api',
+    default: 'http://localhost:5001/api', // Web can safely use localhost
   })
   : 'https://d29xz5ma6wsmg7.cloudfront.net/api';
 
@@ -98,6 +98,9 @@ interface AppStoreState {
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
+  forgotPassword: (email: string) => Promise<string>;
+  verifyCode: (email: string, code: string) => Promise<string>;
+  resetPassword: (email: string, code: string, newPassword: string) => Promise<string>;
   initializeAuth: () => Promise<void>;
 
   setMapFilters: (filters: Partial<MapFilters>) => void;
@@ -300,6 +303,63 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     } catch (err: any) {
       set({ error: err.message, isLoading: false });
       throw err;
+    }
+  },
+
+  forgotPassword: async (email: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to send code');
+      return data.message;
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  verifyCode: async (email: string, code: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/verify-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Invalid code');
+      return data.message;
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  resetPassword: async (email: string, code: string, newPassword: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code, newPassword }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to reset password');
+      return data.message;
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
     }
   },
 
