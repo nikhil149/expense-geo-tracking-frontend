@@ -441,7 +441,14 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         headers: getAuthHeaders(get().token),
         body: JSON.stringify(txData),
       });
-      if (!res.ok) throw new Error('Failed to record transaction');
+      if (!res.ok) {
+        let errMsg = 'Failed to record transaction';
+        try {
+          const errData = await res.json();
+          if (errData.error) errMsg = errData.error;
+        } catch (e) {}
+        throw new Error(errMsg);
+      }
       const newTx = await res.json();
 
       await Promise.all([
