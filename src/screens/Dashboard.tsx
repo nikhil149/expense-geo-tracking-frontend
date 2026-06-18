@@ -105,15 +105,25 @@ export const Dashboard: React.FC<DashboardProps> = ({
   useEffect(() => {
     loadAllData();
     if (Platform.OS === 'android') {
-      RNAndroidNotificationListener.getPermissionStatus().then(status => {
-        setHasListenerPermission(status !== 'denied');
-      });
+      try {
+        if (RNAndroidNotificationListener && RNAndroidNotificationListener.getPermissionStatus) {
+          RNAndroidNotificationListener.getPermissionStatus().then(status => {
+            setHasListenerPermission(status !== 'denied');
+          }).catch(() => setHasListenerPermission(false));
+        }
+      } catch (e) {
+        console.warn('Native module missing for notification listener');
+      }
     }
   }, []);
 
   const requestListenerPermission = () => {
     if (Platform.OS === 'android') {
-      RNAndroidNotificationListener.requestPermission();
+      if (RNAndroidNotificationListener && RNAndroidNotificationListener.requestPermission) {
+        RNAndroidNotificationListener.requestPermission();
+      } else {
+        Alert.alert('Module Missing', 'Native notification module is not installed. Did you build a new EAS APK?');
+      }
     } else {
       Alert.alert('Not Supported', 'True Background Interception is only available on Android OS.');
     }

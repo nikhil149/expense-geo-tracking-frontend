@@ -7,7 +7,9 @@ import { AuthScreen } from '../screens/AuthScreen';
 import { RNAndroidNotificationListenerHeadlessJsName } from 'react-native-android-notification-listener';
 import { backgroundNotificationHandler } from '../utils/notificationHandler';
 
-AppRegistry.registerHeadlessTask(RNAndroidNotificationListenerHeadlessJsName, () => backgroundNotificationHandler);
+if (RNAndroidNotificationListenerHeadlessJsName) {
+  AppRegistry.registerHeadlessTask(RNAndroidNotificationListenerHeadlessJsName, () => backgroundNotificationHandler);
+}
 
 const Icons = LucideIcons as any;
 
