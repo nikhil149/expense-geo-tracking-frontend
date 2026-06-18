@@ -5,6 +5,17 @@ const withAndroidNotificationListener = (config) => {
     const androidManifest = config.modResults;
     const application = androidManifest.manifest.application[0];
 
+    // Ensure tools namespace exists to use tools:replace
+    androidManifest.manifest.$['xmlns:tools'] = 'http://schemas.android.com/tools';
+
+    // Add tools:replace="android:allowBackup" to handle library manifest conflict
+    const currentReplace = application.$['tools:replace'] || '';
+    if (!currentReplace.includes('android:allowBackup')) {
+      application.$['tools:replace'] = currentReplace 
+        ? `${currentReplace},android:allowBackup` 
+        : 'android:allowBackup';
+    }
+
     if (!application.service) {
       application.service = [];
     }
