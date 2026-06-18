@@ -59,10 +59,10 @@ export const MapView = ({
         longitudeDelta: 0.015,
       }
     : {
-        latitude: validLocations.length > 0 ? (validLocations[0].latitude as number) : 37.7749,
-        longitude: validLocations.length > 0 ? (validLocations[0].longitude as number) : -122.4194,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
+        latitude: validLocations.length > 0 ? (validLocations[0].latitude as number) : 20.5937,
+        longitude: validLocations.length > 0 ? (validLocations[0].longitude as number) : 78.9629,
+        latitudeDelta: validLocations.length > 0 ? 0.05 : 20.0,
+        longitudeDelta: validLocations.length > 0 ? 0.05 : 20.0,
       };
 
   const handlePress = (e: any) => {

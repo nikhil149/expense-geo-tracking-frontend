@@ -5,13 +5,13 @@ import { Platform } from 'react-native';
 // TODO: Replace <YOUR_CLOUDFRONT_DOMAIN> with your actual CloudFront distribution domain
 // after completing AWS setup (Part 2.8 of the deployment plan).
 // Example: 'https://d1abc2def3ghij.cloudfront.net/api'
-export const API_BASE_URL = __DEV__
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__
   ? Platform.select({
     android: 'http://10.0.2.2:5001/api',
     ios: 'http://192.168.100.22:5001/api',
     default: 'http://localhost:5001/api', // Web can safely use localhost
   })
-  : 'https://d29xz5ma6wsmg7.cloudfront.net/api';
+  : 'https://d29xz5ma6wsmg7.cloudfront.net/api');
 
 export interface User {
   id: number;

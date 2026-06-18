@@ -14,6 +14,7 @@ import {
 import { useAppStore } from '../store/useAppStore';
 import { GlassCard } from '../components/GlassCard';
 import { parseSMSTransaction } from '../store/smsParser';
+import { RNAndroidNotificationListener } from 'react-native-android-notification-listener';
 import * as LucideIcons from 'lucide-react-native';
 const Icons = LucideIcons as any;
 
@@ -99,9 +100,24 @@ export const Dashboard: React.FC<DashboardProps> = ({
     locationName?: string;
   } | null>(null);
 
+  const [hasListenerPermission, setHasListenerPermission] = useState(false);
+
   useEffect(() => {
     loadAllData();
+    if (Platform.OS === 'android') {
+      RNAndroidNotificationListener.getPermissionStatus().then(status => {
+        setHasListenerPermission(status !== 'denied');
+      });
+    }
   }, []);
+
+  const requestListenerPermission = () => {
+    if (Platform.OS === 'android') {
+      RNAndroidNotificationListener.requestPermission();
+    } else {
+      Alert.alert('Not Supported', 'True Background Interception is only available on Android OS.');
+    }
+  };
 
   const handleRefresh = () => {
     loadAllData();
@@ -325,14 +341,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <Text style={styles.smsTitle}>SMS Notification Auto-Logger</Text>
             </View>
             <View style={styles.smsActiveBadge}>
-              <View style={styles.smsBadgeDot} />
-              <Text style={styles.smsBadgeText}>Active Listener</Text>
+              <View style={[styles.smsBadgeDot, { backgroundColor: hasListenerPermission ? '#10B981' : '#F59E0B' }]} />
+              <Text style={[styles.smsBadgeText, { color: hasListenerPermission ? '#10B981' : '#F59E0B' }]}>
+                {hasListenerPermission ? 'OS Listener Active' : 'OS Listener Disabled'}
+              </Text>
             </View>
           </View>
           
           <Text style={styles.smsDescription}>
-            Simulate incoming bank SMS notifications to test automatic transaction logging and GPS-pinning in real time.
+            Simulate incoming bank SMS notifications, or enable true Android OS Background Interception to auto-log real SMS messages silently.
           </Text>
+
+          {!hasListenerPermission && (
+            <Pressable style={styles.permissionBtn} onPress={requestListenerPermission}>
+              <Icons.Shield size={14} color="#8B5CF6" />
+              <Text style={styles.permissionBtnText}>Enable True Android OS Interception</Text>
+            </Pressable>
+          )}
 
           {/* Quick presets list */}
           <Text style={styles.presetsLabel}>TAP PRESET ALERT TO LOAD:</Text>
@@ -699,6 +724,23 @@ const styles = StyleSheet.create({
     color: '#9CA3AF',
     lineHeight: 18,
     marginBottom: 14,
+  },
+  permissionBtn: {
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 14,
+  },
+  permissionBtnText: {
+    color: '#A78BFA',
+    fontSize: 12,
+    fontWeight: '600',
   },
   presetsLabel: {
     fontSize: 9,

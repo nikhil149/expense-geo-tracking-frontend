@@ -14,6 +14,7 @@ import {
 import { useAppStore, Category, Goal } from '../store/useAppStore';
 import { GlassCard } from '../components/GlassCard';
 import { MapView } from '../components/MapView';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as LucideIcons from 'lucide-react-native';
 const Icons = LucideIcons as any;
 
@@ -79,6 +80,7 @@ export const TransactionForm = ({
   const [newCatName, setNewCatName] = useState('');
   const [newCatColor, setNewCatColor] = useState('#8B5CF6');
   const [newCatIcon, setNewCatIcon] = useState('tag');
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -468,14 +470,42 @@ export const TransactionForm = ({
             />
           </View>
           <View style={styles.inputCol}>
-            <Text style={styles.inputLabel}>Date (YYYY-MM-DD)</Text>
-            <TextInput
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor="#6B7280"
-              value={date}
-              onChangeText={setDate}
-              style={styles.formInput}
-            />
+            <Text style={styles.inputLabel}>Date</Text>
+            {Platform.OS === 'web' ? (
+              <TextInput
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor="#6B7280"
+                value={date}
+                onChangeText={setDate}
+                style={styles.formInput}
+                // @ts-ignore
+                type="date"
+              />
+            ) : (
+              <>
+                <Pressable onPress={() => setShowDatePicker(true)} style={[styles.formInput, { justifyContent: 'center' }]}>
+                  <Text style={{ color: date ? '#FFFFFF' : '#6B7280' }}>
+                    {date || 'Select Date'}
+                  </Text>
+                </Pressable>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={date ? new Date(date) : new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={(event: any, selectedDate?: Date) => {
+                      if (Platform.OS === 'android') setShowDatePicker(false);
+                      if (event.type === 'set' && selectedDate) {
+                        setDate(selectedDate.toISOString().split('T')[0]);
+                      }
+                      if (event.type === 'dismissed') {
+                        setShowDatePicker(false);
+                      }
+                    }}
+                  />
+                )}
+              </>
+            )}
           </View>
         </View>
 

@@ -8,10 +8,12 @@ import {
   TextInput,
   ActivityIndicator,
   Platform,
+  Alert,
 } from 'react-native';
 import { useAppStore, Goal } from '../store/useAppStore';
 import { GlassCard } from '../components/GlassCard';
 import { ProgressBar } from '../components/ProgressBar';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as LucideIcons from 'lucide-react-native';
 const Icons = LucideIcons as any;
 
@@ -31,6 +33,7 @@ export const GoalsTracker: React.FC = () => {
   const [expandedGoalId, setExpandedGoalId] = useState<number | null>(null);
   const [goalDetails, setGoalDetails] = useState<Goal | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Form states
   const [name, setName] = useState('');
@@ -90,13 +93,24 @@ export const GoalsTracker: React.FC = () => {
   };
 
   const handleDeleteGoal = async (id: number) => {
-    if (confirm('Are you sure you want to delete this savings goal? This will unlink associated transactions.')) {
-      await deleteGoal(id);
-      if (expandedGoalId === id) {
-        setExpandedGoalId(null);
-        setGoalDetails(null);
-      }
-    }
+    Alert.alert(
+      'Delete Goal',
+      'Are you sure you want to delete this savings goal? This will unlink associated transactions.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteGoal(id);
+            if (expandedGoalId === id) {
+              setExpandedGoalId(null);
+              setGoalDetails(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const GoalIcon = ({ name, color }: { name: string; color: string }) => {
@@ -162,14 +176,42 @@ export const GoalsTracker: React.FC = () => {
                 />
               </View>
               <View style={styles.inputCol}>
-                <Text style={styles.inputLabel}>Target Date (YYYY-MM-DD)</Text>
-                <TextInput
-                  placeholder="2026-12-31"
-                  placeholderTextColor="#6B7280"
-                  value={targetDate}
-                  onChangeText={setTargetDate}
-                  style={styles.formInput}
-                />
+                <Text style={styles.inputLabel}>Target Date</Text>
+                {Platform.OS === 'web' ? (
+                  <TextInput
+                    placeholder="YYYY-MM-DD"
+                    placeholderTextColor="#6B7280"
+                    value={targetDate}
+                    onChangeText={setTargetDate}
+                    style={styles.formInput}
+                    // @ts-ignore
+                    type="date"
+                  />
+                ) : (
+                  <>
+                    <Pressable onPress={() => setShowDatePicker(true)} style={[styles.formInput, { justifyContent: 'center' }]}>
+                      <Text style={{ color: targetDate ? '#FFFFFF' : '#6B7280' }}>
+                        {targetDate || 'Select Date'}
+                      </Text>
+                    </Pressable>
+                    {showDatePicker && (
+                      <DateTimePicker
+                        value={targetDate ? new Date(targetDate) : new Date()}
+                        mode="date"
+                        display="default"
+                        onChange={(event: any, selectedDate?: Date) => {
+                          if (Platform.OS === 'android') setShowDatePicker(false);
+                          if (event.type === 'set' && selectedDate) {
+                            setTargetDate(selectedDate.toISOString().split('T')[0]);
+                          }
+                          if (event.type === 'dismissed') {
+                            setShowDatePicker(false);
+                          }
+                        }}
+                      />
+                    )}
+                  </>
+                )}
               </View>
             </View>
 

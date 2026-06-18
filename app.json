@@ -46,7 +46,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Allow Geo-Finance to use your location to tag your expenses."
         }
-      ]
+      ],
+      "./plugins/withAndroidNotificationListener.js"
     ],
     "experiments": {
       "typedRoutes": true,
