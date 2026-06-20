@@ -14,7 +14,7 @@ import {
 import { useAppStore } from '../store/useAppStore';
 import { GlassCard } from '../components/GlassCard';
 import { parseSMSTransaction } from '../store/smsParser';
-import { RNAndroidNotificationListener } from 'react-native-android-notification-listener';
+import RNAndroidNotificationListener from 'react-native-android-notification-listener';
 import * as LucideIcons from 'lucide-react-native';
 const Icons = LucideIcons as any;
 
