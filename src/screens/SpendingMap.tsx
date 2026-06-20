@@ -65,12 +65,19 @@ export const SpendingMap: React.FC = () => {
       </View>
 
       {/* Floating Top Header: Total Filtered Expenditure */}
-      <GlassCard style={styles.floatingHeader}>
-        <Text style={styles.headerSub}>Filtered Spending</Text>
-        <Text style={styles.headerMain}>
-          ₹{totalOnMap.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </Text>
-      </GlassCard>
+      <View style={styles.floatingHeaderWrapper}>
+        <GlassCard style={styles.floatingHeaderCard}>
+          <View style={styles.headerIconWrapper}>
+            <Icons.Wallet size={24} color="#8B5CF6" />
+          </View>
+          <View style={styles.headerTextWrapper}>
+            <Text style={styles.headerSub}>Filtered Spending</Text>
+            <Text style={styles.headerMain}>
+              ₹{totalOnMap.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </Text>
+          </View>
+        </GlassCard>
+      </View>
 
       {/* Floating Top Category Scroll Selection */}
       <View style={styles.categoryFiltersWrapper}>
@@ -244,28 +251,52 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
   },
-  floatingHeader: {
+  floatingHeaderWrapper: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 30,
+    top: Platform.OS === 'ios' ? 60 : 40,
     left: 20,
     right: 20,
-    alignItems: 'center',
-    padding: 12,
     zIndex: 10,
-    backgroundColor: 'rgba(17, 24, 39, 0.85)',
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  floatingHeaderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.35)',
+  },
+  headerIconWrapper: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  headerTextWrapper: {
+    flex: 1,
   },
   headerSub: {
-    fontSize: 10,
+    fontSize: 12,
     textTransform: 'uppercase',
     color: '#9CA3AF',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
     fontWeight: '700',
+    marginBottom: 4,
   },
   headerMain: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '900',
     color: '#FFFFFF',
-    marginTop: 2,
+    letterSpacing: -0.5,
   },
   categoryFiltersWrapper: {
     position: 'absolute',

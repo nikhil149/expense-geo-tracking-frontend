@@ -79,8 +79,8 @@ export const MapView = ({
       initialRegion={initialRegion}
       customMapStyle={darkMapStyle}
       onPress={handlePress}
-      showsUserLocation={true}
-      showsMyLocationButton={true}
+      showsUserLocation={false}
+      showsMyLocationButton={false}
     >
       {validLocations.map((loc: MapLocation) => (
         <NativeMarker
