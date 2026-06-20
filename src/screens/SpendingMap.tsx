@@ -64,21 +64,6 @@ export const SpendingMap: React.FC = () => {
         <MapView locations={mapLocations} />
       </View>
 
-      {/* Floating Top Header: Total Filtered Expenditure */}
-      <View style={styles.floatingHeaderWrapper}>
-        <GlassCard style={styles.floatingHeaderCard}>
-          <View style={styles.headerIconWrapper}>
-            <Icons.Wallet size={24} color="#8B5CF6" />
-          </View>
-          <View style={styles.headerTextWrapper}>
-            <Text style={styles.headerSub}>Filtered Spending</Text>
-            <Text style={styles.headerMain}>
-              ₹{totalOnMap.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </Text>
-          </View>
-        </GlassCard>
-      </View>
-
       {/* Floating Top Category Scroll Selection */}
       <View style={styles.categoryFiltersWrapper}>
         <ScrollView
@@ -300,7 +285,7 @@ const styles = StyleSheet.create({
   },
   categoryFiltersWrapper: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 140 : 110,
+    top: Platform.OS === 'ios' ? 60 : 40,
     left: 0,
     right: 0,
     zIndex: 10,
@@ -339,7 +324,7 @@ const styles = StyleSheet.create({
   },
   dateFiltersWrapper: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 200 : 170,
+    top: Platform.OS === 'ios' ? 120 : 100,
     right: 20,
     zIndex: 10,
   },
