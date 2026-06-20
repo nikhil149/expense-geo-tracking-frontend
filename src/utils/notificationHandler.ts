@@ -30,12 +30,31 @@ export const backgroundNotificationHandler = async ({ notification }: any) => {
       const token = await AsyncStorage.getItem('auth_token');
       if (!token) return; // Not logged in
 
+      let latitude = null;
+      let longitude = null;
+      let location_name = 'SMS Intercept';
+
+      try {
+        const Location = require('expo-location');
+        const loc = await Location.getLastKnownPositionAsync();
+        if (loc && loc.coords) {
+          latitude = loc.coords.latitude;
+          longitude = loc.coords.longitude;
+          location_name = 'SMS Intercept (Live GPS)';
+        }
+      } catch (e) {
+        console.warn('Could not fetch background location for SMS transaction.');
+      }
+
       const txData = {
         title: transaction.title,
         amount: transaction.amount,
         type: transaction.type,
         date: transaction.date,
-        // Optional tracking if location is available (Headless JS doesn't have foreground location access, so we skip it)
+        latitude,
+        longitude,
+        location_name,
+        notes: `Auto-captured via OS notification.\nTitle: ${notification.title || ''}`,
       };
 
       const res = await fetch(`${API_BASE_URL}/transactions`, {

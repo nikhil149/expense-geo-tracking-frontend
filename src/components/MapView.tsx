@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useEffect, useRef } from 'react';
 import { StyleSheet } from 'react-native';
-import NativeMap, { Marker as NativeMarker } from 'react-native-maps';
+import NativeMap, { Marker as NativeMarker, PROVIDER_GOOGLE } from 'react-native-maps';
 
 interface MapLocation {
   id: number;
@@ -73,6 +73,7 @@ export const MapView = ({
 
   return (
     <NativeMap
+      provider={PROVIDER_GOOGLE}
       ref={mapRef}
       style={styles.nativeMap}
       initialRegion={initialRegion}

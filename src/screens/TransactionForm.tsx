@@ -74,6 +74,8 @@ export const TransactionForm = ({
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [mapSearchQuery, setMapSearchQuery] = useState('');
   const [mapSuggestions, setMapSuggestions] = useState<any[]>([]);
+  const searchTimeout = React.useRef<NodeJS.Timeout | null>(null);
+  const mapSearchTimeout = React.useRef<NodeJS.Timeout | null>(null);
 
   // Add custom category mini form states
   const [showAddCat, setShowAddCat] = useState(false);
@@ -179,37 +181,41 @@ export const TransactionForm = ({
   };
 
   // Handle store names autocomplete matching via real OSM Nominatim Search API
-  const handleLocationSearchChange = async (query: string) => {
+  const handleLocationSearchChange = (query: string) => {
     setSearchQuery(query);
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+
     if (query.length > 2) {
-      try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=6`,
-          {
-            headers: {
-              'User-Agent': 'ExpenseGeoTrackingApp/1.0',
-            },
+      searchTimeout.current = setTimeout(async () => {
+        try {
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=6`,
+            {
+              headers: {
+                'User-Agent': 'ExpenseGeoTrackingApp/1.0',
+              },
+            }
+          );
+          if (response.ok) {
+            const data = await response.json();
+            const formatted = data.map((item: any) => {
+              const addr = item.address;
+              const name = item.name || addr.amenity || addr.shop || addr.building || addr.road || query;
+              const fullLoc = item.display_name;
+              return {
+                name: name,
+                loc: fullLoc.split(',').slice(0, 3).join(', '),
+                lat: parseFloat(item.lat),
+                lng: parseFloat(item.lon),
+                category: addr.shop || addr.amenity || 'Shopping',
+              };
+            });
+            setSuggestions(formatted);
           }
-        );
-        if (response.ok) {
-          const data = await response.json();
-          const formatted = data.map((item: any) => {
-            const addr = item.address;
-            const name = item.name || addr.amenity || addr.shop || addr.building || addr.road || query;
-            const fullLoc = item.display_name;
-            return {
-              name: name,
-              loc: fullLoc.split(',').slice(0, 3).join(', '),
-              lat: parseFloat(item.lat),
-              lng: parseFloat(item.lon),
-              category: addr.shop || addr.amenity || 'Shopping',
-            };
-          });
-          setSuggestions(formatted);
+        } catch (error) {
+          console.log('Search API Error', error);
         }
-      } catch (err) {
-        // Fallback silently
-      }
+      }, 800);
     } else {
       setSuggestions([]);
     }
