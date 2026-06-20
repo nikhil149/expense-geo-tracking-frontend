@@ -133,9 +133,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
     loadAllData();
   };
 
-  const handleDelete = async (id: number) => {
-    if (confirm('Are you sure you want to delete this transaction?')) {
-      await deleteTransaction(id);
+  const handleDelete = (id: number) => {
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to delete this transaction?')) {
+        deleteTransaction(id);
+      }
+    } else {
+      Alert.alert(
+        'Delete Transaction',
+        'Are you sure you want to delete this transaction?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Delete', style: 'destructive', onPress: () => deleteTransaction(id) }
+        ]
+      );
     }
   };
 
@@ -362,10 +373,27 @@ export const Dashboard: React.FC<DashboardProps> = ({
             Simulate incoming bank SMS notifications, or enable true Android OS Background Interception to auto-log real SMS messages silently.
           </Text>
 
-          {!hasListenerPermission && (
+          {!hasListenerPermission ? (
             <Pressable style={styles.permissionBtn} onPress={requestListenerPermission}>
               <Icons.Shield size={14} color="#8B5CF6" />
               <Text style={styles.permissionBtnText}>Enable True Android OS Interception</Text>
+            </Pressable>
+          ) : (
+            <Pressable 
+              style={[styles.permissionBtn, { backgroundColor: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }]} 
+              onPress={() => {
+                Alert.alert(
+                  'Keep Background Service Alive',
+                  'Android actively kills background services to save battery.\n\nTo ensure the SMS listener runs 24/7 without crashing:\n\n1. Tap "Open Settings"\n2. Tap "App Battery Usage" (or "Battery")\n3. Select "Unrestricted"',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Open Settings', onPress: () => Linking.openSettings() }
+                  ]
+                );
+              }}
+            >
+              <Icons.BatteryCharging size={14} color="#10B981" />
+              <Text style={[styles.permissionBtnText, { color: '#10B981' }]}>Disable Battery Optimization</Text>
             </Pressable>
           )}
 

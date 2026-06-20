@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, View, Text, Platform } from 'react-native';
+import { PieChart } from 'react-native-gifted-charts';
 
 interface SpendingItem {
   category_id: number;
@@ -24,79 +25,58 @@ export const CategoryChart: React.FC<CategoryChartProps> = ({ data }) => {
     );
   }
 
-  // Donut chart configuration
-  const radius = 50;
-  const strokeWidth = 14;
-  const circumference = 2 * Math.PI * radius;
-  let accumulatedPercent = 0;
+  // Format data for Gifted Charts PieChart
+  const pieData = data.map((item) => {
+    const amount = Number(item.total_amount) || 0;
+    return {
+      value: amount,
+      color: item.category_color || '#8B5CF6',
+      focused: true,
+    };
+  });
 
   return (
     <View style={styles.container}>
-      {/* SVG Donut Visual */}
       <View style={styles.chartWrapper}>
-        {/* Render on Web/Native using standard platform wrapper */}
         {Platform.OS === 'web' ? (
-          <svg width="160" height="160" viewBox="0 0 160 160" style={{ transform: 'rotate(-90deg)' }}>
-            <circle
-              cx="80"
-              cy="80"
-              r={radius}
-              fill="transparent"
-              stroke="rgba(255, 255, 255, 0.05)"
-              strokeWidth={strokeWidth}
-            />
-            {data.map((item, idx) => {
-              const amount = Number(item.total_amount) || 0;
-              const percent = amount / total;
-              const strokeLength = percent * circumference;
-              const strokeOffset = circumference - (accumulatedPercent * circumference);
-              accumulatedPercent += percent;
-
+          <PieChart
+            data={pieData}
+            donut
+            radius={80}
+            innerRadius={60}
+            strokeWidth={0}
+            centerLabelComponent={() => {
               return (
-                <circle
-                  key={idx}
-                  cx="80"
-                  cy="80"
-                  r={radius}
-                  fill="transparent"
-                  stroke={item.category_color}
-                  strokeWidth={strokeWidth}
-                  strokeDasharray={`${strokeLength} ${circumference}`}
-                  strokeDashoffset={strokeOffset}
-                  strokeLinecap="round"
-                  style={{ transition: 'stroke-dashoffset 0.5s ease' }}
-                />
+                <View style={styles.centerTextContainer}>
+                  <Text style={styles.centerSubText}>Total</Text>
+                  <Text style={styles.centerMainText}>
+                    ₹{total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </Text>
+                </View>
               );
-            })}
-          </svg>
+            }}
+          />
         ) : (
-          /* Native fallback: simplified layout if react-native-svg is compiling,
-             rendered as concentric colorful progress rings or a gorgeous solid visual bar */
-          <View style={styles.nativeRingContainer}>
-            <View style={styles.nativeBar}>
-              {data.map((item, idx) => {
-                const amount = Number(item.total_amount) || 0;
-                const percent = (amount / total) * 100;
+          <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+            <PieChart
+              data={pieData}
+              donut
+              radius={80}
+              innerRadius={60}
+              strokeWidth={0}
+              centerLabelComponent={() => {
                 return (
-                  <View
-                    key={idx}
-                    style={{
-                      height: '100%',
-                      width: `${percent}%`,
-                      backgroundColor: item.category_color,
-                    }}
-                  />
+                  <View style={styles.centerTextContainer}>
+                    <Text style={styles.centerSubText}>Total</Text>
+                    <Text style={styles.centerMainText}>
+                      ₹{total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    </Text>
+                  </View>
                 );
-              })}
-            </View>
+              }}
+            />
           </View>
         )}
-        <View style={styles.centerTextContainer}>
-          <Text style={styles.centerSubText}>Total Spending</Text>
-          <Text style={styles.centerMainText}>
-            ₹{total.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-          </Text>
-        </View>
       </View>
 
       {/* Legend & Breakdown List */}

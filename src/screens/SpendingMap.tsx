@@ -8,6 +8,7 @@ import {
   Pressable,
   Platform,
   Linking,
+  Alert,
 } from 'react-native';
 import { useAppStore } from '../store/useAppStore';
 import { MapView } from '../components/MapView';
@@ -204,14 +205,31 @@ export const SpendingMap: React.FC = () => {
                           })}
                         </Text>
                       </View>
-                      <Text
-                        style={[
-                          styles.locItemAmt,
-                          { color: loc.type === 'income' ? '#10B981' : loc.type === 'investment' ? '#6366F1' : '#EF4444' },
-                        ]}
-                      >
-                        {isExpense ? '-' : '+'}₹{loc.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </Text>
+                      <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
+                        <Text
+                          style={[
+                            styles.locItemAmt,
+                            { color: loc.type === 'income' ? '#10B981' : loc.type === 'investment' ? '#6366F1' : '#EF4444' },
+                          ]}
+                        >
+                          {isExpense ? '-' : '+'}₹{loc.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Text>
+                        <Pressable 
+                          style={{ marginTop: 6 }}
+                          onPress={() => {
+                            if (Platform.OS === 'web') {
+                              if (window.confirm('Delete this transaction?')) useAppStore.getState().deleteTransaction(loc.id);
+                            } else {
+                              Alert.alert('Delete', 'Delete this transaction?', [
+                                { text: 'Cancel', style: 'cancel' },
+                                { text: 'Delete', style: 'destructive', onPress: () => useAppStore.getState().deleteTransaction(loc.id) }
+                              ]);
+                            }
+                          }}
+                        >
+                          <Icons.Trash2 size={12} color="#EF4444" />
+                        </Pressable>
+                      </View>
                     </View>
                   </GlassCard>
                 );
