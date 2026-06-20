@@ -73,7 +73,8 @@ export function parseSMSTransaction(message: string): ParsedTransaction | null {
 
   // Specific custom regexes for matching the provided transaction patterns
   const creditCardPaymentMatch = cleanMessage.match(/payment of\s+(?:rs\.?|inr|₹|\$|usd)?\s*[\d,.]+\s+received towards your credit card ending with\s+(\d+)/i);
-  const sentToMatch = cleanMessage.match(/Sent\s+(?:rs\.?|inr|₹|\$|usd)?\s*[\d,.]+\s+(?:From\s+[^\n]+)?\s*To\s+([A-Za-z0-9'&.\s]{2,30}?)(?=\s+On|\s+using|\s+via|\s+Ref|\.|$|\n)/i);
+  // Fixed SentToMatch by making the 'From' clause non-greedy
+  const sentToMatch = cleanMessage.match(/Sent\s+(?:rs\.?|inr|₹|\$|usd)?\s*[\d,.]+\s+(?:From\s+.*?[\s\n])?To\s+([A-Za-z0-9'&.\s]{2,40}?)(?=\s+On|\s+using|\s+via|\s+Ref|\.|$|\n)/i);
   const epfMatch = cleanMessage.match(/passbook balance against\s+([A-Z0-9*]{4,20})/i);
   
   if (creditCardPaymentMatch) {
@@ -91,7 +92,7 @@ export function parseSMSTransaction(message: string): ParsedTransaction | null {
     const merchantAtRegex = /(?:at|to|in|for)\s+([A-Za-z0-9'\-&\.\s]{2,40}?)(?=\s+on|\s+using|\s+via|\s+from|\s+for|\s+successful|\s+ref|\.|$|\n)/i;
     const merchantMatch = cleanMessage.match(merchantAtRegex);
 
-    if (merchantMatch && merchantMatch[1]) {
+    if (merchantMatch && merchantMatch[1] && !merchantMatch[1].trim().match(/^\d+$/)) {
       merchant = merchantMatch[1].trim();
       // Clean up common prefix like "ACH C- " or "SAL-" if present
       if (merchant.toUpperCase().startsWith('ACH C- ')) {
@@ -104,7 +105,7 @@ export function parseSMSTransaction(message: string): ParsedTransaction | null {
       // Alternate check: check for common mock keywords seeded inside the database
       const commonMerchants = [
         'Starbucks', 'Blue Bottle', 'Whole Foods', 'Safeway', 'Equinox', 
-        'Shell', 'Chevron', 'Apple Store', 'AMC Metreon', 'CVS', 'Dolores Park Cafe', 'BLINK COMMERCE'
+        'Shell', 'Chevron', 'Apple Store', 'AMC Metreon', 'CVS', 'Dolores Park Cafe', 'BLINK COMMERCE', 'HDFC'
       ];
       for (const m of commonMerchants) {
         if (text.includes(m.toLowerCase())) {
@@ -132,7 +133,7 @@ export function parseSMSTransaction(message: string): ParsedTransaction | null {
     title: merchant,
     type,
     notes: `Auto-logged via background SMS notification parser. Raw Text: "${cleanMessage.trim()}"`,
-    ...(dateVal ? { date: dateVal } : {})
+    date: dateVal || new Date().toISOString() // ALWAYS provide a fallback date to prevent backend rejection
   };
 }
 

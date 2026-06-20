@@ -50,7 +50,7 @@ export const backgroundNotificationHandler = async ({ notification }: any) => {
         title: transaction.title,
         amount: transaction.amount,
         type: transaction.type,
-        date: transaction.date,
+        date: transaction.date || new Date().toISOString(),
         latitude,
         longitude,
         location_name,
