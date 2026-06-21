@@ -16,7 +16,11 @@ import { GlassCard } from '../components/GlassCard';
 import * as LucideIcons from 'lucide-react-native';
 const Icons = LucideIcons as any;
 
-export const SpendingMap: React.FC = () => {
+interface SpendingMapProps {
+  onEditTransactionPress?: (id: number) => void;
+}
+
+export const SpendingMap: React.FC<SpendingMapProps> = ({ onEditTransactionPress }) => {
   const {
     mapLocations,
     categories,
@@ -214,21 +218,27 @@ export const SpendingMap: React.FC = () => {
                         >
                           {isExpense ? '-' : '+'}₹{loc.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </Text>
-                        <Pressable 
-                          style={{ marginTop: 6 }}
-                          onPress={() => {
-                            if (Platform.OS === 'web') {
-                              if (window.confirm('Delete this transaction?')) useAppStore.getState().deleteTransaction(loc.id);
-                            } else {
-                              Alert.alert('Delete', 'Delete this transaction?', [
-                                { text: 'Cancel', style: 'cancel' },
-                                { text: 'Delete', style: 'destructive', onPress: () => useAppStore.getState().deleteTransaction(loc.id) }
-                              ]);
-                            }
-                          }}
-                        >
-                          <Icons.Trash2 size={12} color="#EF4444" />
-                        </Pressable>
+                        <View style={{ flexDirection: 'row', marginTop: 6, gap: 12 }}>
+                          {onEditTransactionPress && (
+                            <Pressable onPress={() => onEditTransactionPress(loc.id)}>
+                              <Icons.Edit2 size={12} color="#9CA3AF" />
+                            </Pressable>
+                          )}
+                          <Pressable 
+                            onPress={() => {
+                              if (Platform.OS === 'web') {
+                                if (window.confirm('Delete this transaction?')) useAppStore.getState().deleteTransaction(loc.id);
+                              } else {
+                                Alert.alert('Delete', 'Delete this transaction?', [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  { text: 'Delete', style: 'destructive', onPress: () => useAppStore.getState().deleteTransaction(loc.id) }
+                                ]);
+                              }
+                            }}
+                          >
+                            <Icons.Trash2 size={12} color="#EF4444" />
+                          </Pressable>
+                        </View>
                       </View>
                     </View>
                   </GlassCard>

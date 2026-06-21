@@ -1,11 +1,37 @@
-import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, Modal } from 'react-native';
 import { SpendingMap } from '@/screens/SpendingMap';
+import { TransactionForm } from '@/screens/TransactionForm';
 
 export default function MapRoute() {
+  const [showForm, setShowForm] = useState(false);
+  const [editingTxId, setEditingTxId] = useState<number | null>(null);
+
+  const handleOpenEdit = (id: number) => {
+    setEditingTxId(id);
+    setShowForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setEditingTxId(null);
+  };
+
   return (
     <View style={styles.container}>
-      <SpendingMap />
+      <SpendingMap onEditTransactionPress={handleOpenEdit} />
+
+      <Modal
+        visible={showForm}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleCloseForm}
+      >
+        <TransactionForm
+          transactionId={editingTxId}
+          onClose={handleCloseForm}
+        />
+      </Modal>
     </View>
   );
 }
