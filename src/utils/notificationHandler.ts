@@ -1,78 +1,128 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { parseSMSTransaction } from '../store/smsParser';
-import { API_BASE_URL } from '../store/useAppStore';
 
+/**
+ * Resolve the correct API base URL for the background headless context.
+ *
+ * When Android cold-starts the JS engine for a headless task the normal
+ * `__DEV__` global is unavailable and `Platform.select` may resolve to
+ * `localhost` which is unreachable.  We therefore fall back to the
+ * production CloudFront URL whenever the stored/envvar URL is absent.
+ */
+function getBackgroundApiUrl(): string {
+  // Try the environment variable first (set via Expo env)
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+  // In a headless background context we cannot rely on __DEV__ so always
+  // use the production URL.
+  return 'https://d29xz5ma6wsmg7.cloudfront.net/api';
+}
+
+/**
+ * Headless notification handler.
+ *
+ * Invoked by `react-native-android-notification-listener` whenever any
+ * notification arrives on the device — even if the app is killed.
+ *
+ * The library passes `{ notification }` where `notification` is a **JSON
+ * string**, not a parsed object.  We must JSON.parse it ourselves.
+ */
 export const backgroundNotificationHandler = async ({ notification }: any) => {
   if (!notification) return;
 
   try {
-    let notificationText = '';
-    
-    // Attempt to extract text from the notification object
+    // ── 1. Parse the raw notification payload ────────────────────────
+    let parsed: any = {};
+
     if (typeof notification === 'string') {
       try {
-        const parsed = JSON.parse(notification);
-        notificationText = parsed.text || parsed.titleBig || parsed.title || '';
-      } catch (e) {
-        notificationText = notification;
+        parsed = JSON.parse(notification);
+      } catch (_jsonErr) {
+        // Not JSON — treat the entire string as the notification text
+        parsed = { text: notification };
       }
     } else {
-      notificationText = notification.text || notification.titleBig || notification.title || '';
+      parsed = notification;
     }
+
+    // Build a single text blob from all available fields
+    const notificationText = [
+      parsed.text,
+      parsed.titleBig,
+      parsed.title,
+      parsed.subText,
+      parsed.bigText,
+      parsed.summaryText,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
 
     if (!notificationText) return;
 
-    // Run the text through our SMS parsing engine
+    // ── 2. Run the SMS parsing engine ────────────────────────────────
     const transaction = parseSMSTransaction(notificationText);
-    
-    if (transaction) {
-      // It's a valid transaction alert (Debit/Credit). Try to auto-log it.
-      const token = await AsyncStorage.getItem('auth_token');
-      if (!token) return; // Not logged in
+    if (!transaction) return; // Not a bank transaction — ignore silently
 
-      let latitude = null;
-      let longitude = null;
-      let location_name = 'SMS Intercept';
+    // ── 3. Check that the user is logged in ──────────────────────────
+    const token = await AsyncStorage.getItem('auth_token');
+    if (!token) return;
 
-      try {
-        const Location = require('expo-location');
-        const loc = await Location.getLastKnownPositionAsync();
-        if (loc && loc.coords) {
-          latitude = loc.coords.latitude;
-          longitude = loc.coords.longitude;
-          location_name = 'SMS Intercept (Live GPS)';
-        }
-      } catch (e) {
-        console.warn('Could not fetch background location for SMS transaction.');
+    // ── 4. Attempt to grab the last-known GPS position ──────────────
+    let latitude: number | null = null;
+    let longitude: number | null = null;
+    let location_name = 'SMS Intercept';
+
+    try {
+      const Location = require('expo-location');
+      const loc = await Location.getLastKnownPositionAsync();
+      if (loc && loc.coords) {
+        latitude = loc.coords.latitude;
+        longitude = loc.coords.longitude;
+        location_name = 'SMS Intercept (Live GPS)';
       }
+    } catch (_locErr) {
+      // GPS unavailable in headless context — proceed without coordinates
+    }
 
-      const txData = {
-        title: transaction.title,
-        amount: transaction.amount,
-        type: transaction.type,
-        date: transaction.date || new Date().toISOString(),
-        latitude,
-        longitude,
-        location_name,
-        notes: `Auto-captured via OS notification.\nTitle: ${notification.title || ''}`,
-      };
+    // ── 5. POST the transaction to the backend API ───────────────────
+    const apiUrl = getBackgroundApiUrl();
 
-      const res = await fetch(`${API_BASE_URL}/transactions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(txData),
-      });
+    const txData = {
+      title: transaction.title,
+      amount: transaction.amount,
+      type: transaction.type,
+      date: transaction.date || new Date().toISOString(),
+      latitude,
+      longitude,
+      location_name,
+      notes: `Auto-captured via OS notification.\nSource app: ${parsed.app || 'unknown'}\nTitle: ${parsed.title || ''}`,
+    };
 
-      if (!res.ok) {
-        console.error('Failed to auto-log notification transaction:', await res.text());
-      } else {
-        console.log('Successfully intercepted and logged transaction:', transaction.title);
-      }
+    const res = await fetch(`${apiUrl}/transactions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(txData),
+    });
+
+    if (!res.ok) {
+      console.error(
+        '[NotificationHandler] Failed to auto-log transaction:',
+        res.status,
+        await res.text().catch(() => ''),
+      );
+    } else {
+      console.log(
+        '[NotificationHandler] ✅ Auto-logged:',
+        transaction.title,
+        '₹' + transaction.amount,
+      );
     }
   } catch (error) {
-    console.error('Error handling background notification:', error);
+    console.error('[NotificationHandler] Unhandled error:', error);
   }
 };
