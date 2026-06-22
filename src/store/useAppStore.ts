@@ -7,8 +7,8 @@ import { Platform } from 'react-native';
 // Example: 'https://d1abc2def3ghij.cloudfront.net/api'
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__
   ? Platform.select({
-    android: 'http://10.0.2.2:5001/api',
-    ios: 'http://192.168.100.22:5001/api',
+    android: 'http://192.168.0.104:5001/api', // Use computer's actual LAN IP for physical android devices
+    ios: 'http://192.168.0.104:5001/api', // Use computer's actual LAN IP for physical iOS devices
     default: 'http://localhost:5001/api', // Web can safely use localhost
   })
   : 'https://d29xz5ma6wsmg7.cloudfront.net/api');
@@ -31,7 +31,7 @@ export interface Transaction {
   id: number;
   title: string;
   amount: number;
-  type: 'income' | 'expense' | 'investment';
+  type: 'income' | 'expense' | 'investment' | 'transfer';
   date: string;
   category_id: number | null;
   category_name?: string;

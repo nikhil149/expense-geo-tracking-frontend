@@ -548,6 +548,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
                           </Text>
                         </View>
                       )}
+                      {tx.type === 'transfer' && (
+                        <View style={[styles.goalBadge, { backgroundColor: 'rgba(245, 158, 11, 0.12)' }]}>
+                          <Icons.ArrowLeftRight size={10} color="#F59E0B" />
+                          <Text style={[styles.goalBadgeText, { color: '#F59E0B' }]} numberOfLines={1}>
+                            Self/Family
+                          </Text>
+                        </View>
+                      )}
                     </View>
                     
                     {/* Location tag with Pin icon */}
@@ -589,10 +597,10 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <Text
                       style={[
                         styles.txAmount,
-                        { color: isIncome ? '#10B981' : tx.type === 'investment' ? '#6366F1' : '#EF4444' },
+                        { color: isIncome ? '#10B981' : tx.type === 'investment' ? '#6366F1' : tx.type === 'transfer' ? '#F59E0B' : '#EF4444' },
                       ]}
                     >
-                      {isIncome ? '+' : '-'}₹{txAmt.toLocaleString('en-IN', {
+                      {tx.type === 'transfer' ? '↔' : isIncome ? '+' : '-'}₹{txAmt.toLocaleString('en-IN', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
@@ -938,7 +946,7 @@ const styles = StyleSheet.create({
   },
   txRowInner: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   txIconBox: {
     width: 44,
@@ -1022,9 +1030,8 @@ const styles = StyleSheet.create({
   },
   txRightCol: {
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    height: '100%',
-    minHeight: 44,
+    justifyContent: 'flex-start',
+    paddingTop: 2,
   },
   txAmount: {
     fontSize: 15,

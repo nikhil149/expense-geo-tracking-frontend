@@ -56,7 +56,7 @@ export const TransactionForm = ({
   // Form fields
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
-  const [type, setType] = useState<'income' | 'expense' | 'investment'>('expense');
+  const [type, setType] = useState<'income' | 'expense' | 'investment' | 'transfer'>('expense');
   const [date, setDate] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [notes, setNotes] = useState('');
@@ -403,7 +403,9 @@ export const TransactionForm = ({
 
         {/* Transaction Type Selector */}
         <View style={styles.typeSelector}>
-          {(['expense', 'income', 'investment'] as const).map((t) => (
+          {(['expense', 'income', 'investment', 'transfer'] as const).map((t) => {
+            const label = t === 'transfer' ? 'Self/Family' : t;
+            return (
             <Pressable
               key={t}
               style={[
@@ -412,6 +414,7 @@ export const TransactionForm = ({
                 type === t && t === 'expense' && { backgroundColor: 'rgba(239, 68, 68, 0.15)' },
                 type === t && t === 'income' && { backgroundColor: 'rgba(16, 185, 129, 0.15)' },
                 type === t && t === 'investment' && { backgroundColor: 'rgba(99, 102, 241, 0.15)' },
+                type === t && t === 'transfer' && { backgroundColor: 'rgba(245, 158, 11, 0.15)' },
               ]}
               onPress={() => setType(t)}
             >
@@ -419,15 +422,16 @@ export const TransactionForm = ({
                 style={[
                   styles.typeBtnText,
                   type === t && {
-                    color: t === 'expense' ? '#EF4444' : t === 'income' ? '#10B981' : '#6366F1',
+                    color: t === 'expense' ? '#EF4444' : t === 'income' ? '#10B981' : t === 'investment' ? '#6366F1' : '#F59E0B',
                     fontWeight: '800',
                   },
                 ]}
               >
-                {t}
+                {label}
               </Text>
             </Pressable>
-          ))}
+            );
+          })}
         </View>
 
         {/* Autocomplete Location Input */}
