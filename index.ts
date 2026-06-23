@@ -7,11 +7,13 @@
  * background and still find the task handler — even when the app has been
  * killed / swiped away by the user.
  *
- * After registering the headless task we hand off to Expo Router's normal
- * entry point which boots the rest of the application.
+ * IMPORTANT: We use require() instead of import for the headless registration
+ * because ES `import` statements are hoisted to the top of the module by the
+ * bundler — which would cause expo-router/entry to run before our headless
+ * task registration.
  */
 
-import { AppRegistry, Platform } from 'react-native';
+const { AppRegistry, Platform } = require('react-native');
 
 if (Platform.OS === 'android') {
   try {
@@ -28,6 +30,7 @@ if (Platform.OS === 'android') {
         RNAndroidNotificationListenerHeadlessJsName,
         () => backgroundNotificationHandler,
       );
+      console.log('[index.ts] ✅ Headless notification task registered');
     }
   } catch (e) {
     // Silently ignore on platforms where the native module is unavailable
@@ -36,5 +39,5 @@ if (Platform.OS === 'android') {
   }
 }
 
-// Boot the normal Expo Router application
-import 'expo-router/entry';
+// Boot the normal Expo Router application AFTER registering the headless task
+require('expo-router/entry');
