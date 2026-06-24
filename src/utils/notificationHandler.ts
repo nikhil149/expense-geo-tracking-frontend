@@ -75,15 +75,23 @@ export const backgroundNotificationHandler = async ({ notification }: any) => {
     let location_name = 'SMS Intercept';
 
     try {
-      const Location = require('expo-location');
-      const loc = await Location.getLastKnownPositionAsync();
-      if (loc && loc.coords) {
-        latitude = loc.coords.latitude;
-        longitude = loc.coords.longitude;
-        location_name = 'SMS Intercept (Live GPS)';
+      // Read the GPS position that the foreground app cached in AsyncStorage.
+      // This avoids needing ACCESS_BACKGROUND_LOCATION (which triggers
+      // Google Play's strict review). The foreground app updates this cache
+      // whenever it successfully obtains a GPS fix.
+      const { getCachedLocation } = require('./locationCache');
+      const cached = await getCachedLocation();
+
+      if (cached) {
+        latitude = cached.latitude;
+        longitude = cached.longitude;
+        location_name = 'SMS Intercept (Cached GPS)';
       }
-    } catch (_locErr) {
-      // GPS unavailable in headless context — proceed without coordinates
+    } catch (_locErr: any) {
+      console.warn(
+        '[NotificationHandler] Could not read cached GPS position:',
+        _locErr?.message || _locErr,
+      );
     }
 
     // ── 5. POST the transaction to the backend API ───────────────────
@@ -120,6 +128,10 @@ export const backgroundNotificationHandler = async ({ notification }: any) => {
         '[NotificationHandler] ✅ Auto-logged:',
         transaction.title,
         '₹' + transaction.amount,
+        `| Location: ${location_name}`,
+        latitude !== null && longitude !== null
+          ? `(${latitude}, ${longitude})`
+          : '(no coords)',
       );
     }
   } catch (error) {

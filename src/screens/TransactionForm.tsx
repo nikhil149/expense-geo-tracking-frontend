@@ -14,6 +14,7 @@ import {
 import { useAppStore, Category, Goal } from '../store/useAppStore';
 import { GlassCard } from '../components/GlassCard';
 import { MapView } from '../components/MapView';
+import { cacheLocation } from '../utils/locationCache';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as LucideIcons from 'lucide-react-native';
 const Icons = LucideIcons as any;
@@ -289,6 +290,7 @@ export const TransactionForm = ({
         setLatitude(lat);
         setLongitude(lng);
         setUserLocation({ latitude: lat, longitude: lng });
+        cacheLocation(lat, lng);
 
         // Reverse-geocoding using OSM Nominatim API
         try {

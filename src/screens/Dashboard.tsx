@@ -14,6 +14,7 @@ import {
 import { useAppStore } from '../store/useAppStore';
 import { GlassCard } from '../components/GlassCard';
 import { parseSMSTransaction } from '../store/smsParser';
+import { cacheLocation } from '../utils/locationCache';
 import RNAndroidNotificationListener from 'react-native-android-notification-listener';
 import * as LucideIcons from 'lucide-react-native';
 const Icons = LucideIcons as any;
@@ -104,6 +105,28 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   useEffect(() => {
     loadAllData();
+
+    // Proactively cache the user's GPS position for the background
+    // notification handler (avoids needing ACCESS_BACKGROUND_LOCATION)
+    if (Platform.OS !== 'web') {
+      (async () => {
+        try {
+          const Location = require('expo-location');
+          const { status } = await Location.getForegroundPermissionsAsync();
+          if (status === 'granted') {
+            const loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            if (loc?.coords) {
+              cacheLocation(loc.coords.latitude, loc.coords.longitude);
+            }
+          }
+        } catch (_e) {
+          // Non-critical — ignore silently
+        }
+      })();
+    }
+
     if (Platform.OS === 'android') {
       try {
         if (RNAndroidNotificationListener && RNAndroidNotificationListener.getPermissionStatus) {
@@ -196,6 +219,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           latitude = pos.coords.latitude;
           longitude = pos.coords.longitude;
           locationName = 'Live Web GPS Pin';
+          cacheLocation(latitude, longitude);
         } else {
           const Location = require('expo-location');
           const { status } = await Location.requestForegroundPermissionsAsync();
@@ -204,6 +228,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             latitude = loc.coords.latitude;
             longitude = loc.coords.longitude;
             locationName = 'Live Mobile GPS Pin';
+            cacheLocation(latitude, longitude);
           } else {
             throw new Error('Permission denied');
           }
