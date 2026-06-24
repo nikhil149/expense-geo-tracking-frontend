@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -9,12 +9,25 @@ import {
   Platform,
   Linking,
   Alert,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
-import { useAppStore } from '../store/useAppStore';
+import { useAppStore, RegionBounds } from '../store/useAppStore';
 import { MapView } from '../components/MapView';
 import { GlassCard } from '../components/GlassCard';
 import * as LucideIcons from 'lucide-react-native';
 const Icons = LucideIcons as any;
+
+// Nominatim search result shape
+interface NominatimResult {
+  place_id: number;
+  display_name: string;
+  lat: string;
+  lon: string;
+  boundingbox: [string, string, string, string]; // [south, north, west, east]
+  type: string;
+  class: string;
+}
 
 interface SpendingMapProps {
   onEditTransactionPress?: (id: number) => void;
@@ -28,14 +41,106 @@ export const SpendingMap: React.FC<SpendingMapProps> = ({ onEditTransactionPress
     setMapFilters,
     resetMapFilters,
     fetchSpendingLocations,
+    regionSpending,
+    isRegionLoading,
+    fetchRegionSpending,
+    clearRegionSpending,
   } = useAppStore();
 
   const [activeDateFilter, setActiveDateFilter] = useState<'all' | 'week' | 'month'>('all');
   const [showDrawer, setShowDrawer] = useState(true);
 
+  // ── Location Search State ──────────────────────────────────────────
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<NominatimResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<NominatimResult | null>(null);
+  const [mapRegion, setMapRegion] = useState<{
+    latitude: number;
+    longitude: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
+  } | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     fetchSpendingLocations();
   }, []);
+
+  // ── Debounced Nominatim Geocoding ──────────────────────────────────
+  const handleSearchChange = useCallback((text: string) => {
+    setSearchQuery(text);
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+
+    if (!text.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(text)}&format=json&limit=5&addressdetails=0`,
+          {
+            headers: {
+              'User-Agent': 'ExpenseGeoTrackingApp/1.0',
+            },
+          },
+        );
+        const data: NominatimResult[] = await res.json();
+        setSearchResults(data);
+      } catch (_err) {
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500);
+  }, []);
+
+  // ── Handle Place Selection ─────────────────────────────────────────
+  const handlePlaceSelect = useCallback(
+    (place: NominatimResult) => {
+      setSelectedPlace(place);
+      setSearchResults([]);
+      setSearchQuery(place.display_name.split(',')[0]); // Show short name
+
+      // Nominatim boundingbox: [south_lat, north_lat, west_lng, east_lng]
+      const [south, north, west, east] = place.boundingbox.map(Number);
+
+      const bounds: RegionBounds = {
+        minLat: south,
+        maxLat: north,
+        minLng: west,
+        maxLng: east,
+      };
+
+      // Animate map to the region
+      setMapRegion({
+        latitude: parseFloat(place.lat),
+        longitude: parseFloat(place.lon),
+        latitudeDelta: Math.abs(north - south) * 1.15, // slight padding
+        longitudeDelta: Math.abs(east - west) * 1.15,
+      });
+
+      // Fetch spending aggregation for this region
+      fetchRegionSpending(bounds);
+    },
+    [fetchRegionSpending],
+  );
+
+  // ── Clear Search ───────────────────────────────────────────────────
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setSelectedPlace(null);
+    setMapRegion(null);
+    clearRegionSpending();
+  }, [clearRegionSpending]);
 
   // Update date ranges based on quick filter selection
   const handleDateFilterSelect = (type: 'all' | 'week' | 'month') => {
@@ -62,96 +167,224 @@ export const SpendingMap: React.FC<SpendingMapProps> = ({ onEditTransactionPress
   // Calculate total amount representing visible map coordinates
   const totalOnMap = mapLocations.reduce((sum, loc) => sum + (loc.type === 'expense' ? loc.amount : 0), 0);
 
+  // Format currency
+  const formatINR = (amount: number) =>
+    '₹' + amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
   return (
     <View style={styles.container}>
       {/* Full screen Polymorphic Map */}
       <View style={styles.mapContainer}>
-        <MapView locations={mapLocations} />
+        <MapView locations={mapLocations} region={mapRegion} />
       </View>
 
-      {/* Floating Top Category Scroll Selection */}
-      <View style={styles.categoryFiltersWrapper}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryScrollContent}
+      {/* ── Floating Search Bar ─────────────────────────────────────── */}
+      <View style={styles.searchWrapper}>
+        <GlassCard
+          style={styles.searchCard}
+          backgroundColor="rgba(11, 15, 25, 0.92)"
+          borderColor="rgba(139, 92, 246, 0.25)"
         >
-          <Pressable
-            style={[
-              styles.filterBadge,
-              mapFilters.category_id === null && styles.filterBadgeActive,
-            ]}
-            onPress={() => handleCategorySelect(null)}
-          >
-            <Text
-              style={[
-                styles.badgeText,
-                mapFilters.category_id === null && styles.badgeTextActive,
-              ]}
-            >
-              All Categories
-            </Text>
-          </Pressable>
+          <View style={styles.searchInputRow}>
+            <Icons.Search size={16} color="#9CA3AF" style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search location (e.g. Bengaluru)"
+              placeholderTextColor="#6B7280"
+              value={searchQuery}
+              onChangeText={handleSearchChange}
+              returnKeyType="search"
+            />
+            {isSearching && (
+              <ActivityIndicator size="small" color="#8B5CF6" style={{ marginLeft: 4 }} />
+            )}
+            {(searchQuery.length > 0 || selectedPlace) && !isSearching && (
+              <Pressable onPress={handleClearSearch} hitSlop={8}>
+                <Icons.X size={16} color="#9CA3AF" />
+              </Pressable>
+            )}
+          </View>
+        </GlassCard>
 
-          {categories.map((cat) => {
-            const isSelected = mapFilters.category_id === cat.id;
-            return (
+        {/* Autocomplete Dropdown */}
+        {searchResults.length > 0 && (
+          <View style={styles.autocompleteDropdown}>
+            {searchResults.map((result) => (
               <Pressable
-                key={cat.id}
-                style={[
-                  styles.filterBadge,
-                  isSelected && {
-                    backgroundColor: cat.color,
-                    borderColor: cat.color,
-                  },
-                ]}
-                onPress={() => handleCategorySelect(cat.id)}
+                key={result.place_id}
+                style={styles.autocompleteItem}
+                onPress={() => handlePlaceSelect(result)}
               >
-                <View style={styles.badgeInner}>
-                  <Text
-                    style={[
-                      styles.badgeText,
-                      isSelected && styles.badgeTextActive,
-                    ]}
-                  >
-                    {cat.name}
+                <Icons.MapPin size={14} color="#8B5CF6" style={{ marginRight: 8, flexShrink: 0 }} />
+                <Text style={styles.autocompleteText} numberOfLines={2}>
+                  {result.display_name}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+      </View>
+
+      {/* ── Region Spending Summary Card ───────────────────────────── */}
+      {selectedPlace && (
+        <View style={styles.regionSummaryWrapper}>
+          <GlassCard
+            style={styles.regionSummaryCard}
+            backgroundColor="rgba(11, 15, 25, 0.94)"
+            borderColor="rgba(139, 92, 246, 0.3)"
+          >
+            {/* Header */}
+            <View style={styles.regionHeader}>
+              <View style={styles.regionTitleRow}>
+                <Icons.MapPin size={16} color="#8B5CF6" />
+                <Text style={styles.regionTitle} numberOfLines={1}>
+                  {searchQuery}
+                </Text>
+              </View>
+              <Pressable onPress={handleClearSearch} hitSlop={12}>
+                <Icons.X size={16} color="#6B7280" />
+              </Pressable>
+            </View>
+
+            {/* Stats Grid */}
+            {isRegionLoading ? (
+              <View style={styles.regionLoadingRow}>
+                <ActivityIndicator size="small" color="#8B5CF6" />
+                <Text style={styles.regionLoadingText}>Calculating...</Text>
+              </View>
+            ) : regionSpending ? (
+              <View style={styles.statsGrid}>
+                {/* Total Spending */}
+                <View style={styles.statColumn}>
+                  <Text style={styles.statLabel}>Total</Text>
+                  <Text style={[styles.statAmount, { color: '#F59E0B' }]}>
+                    {formatINR(regionSpending.totalSpending)}
+                  </Text>
+                  <Text style={styles.statCount}>
+                    {regionSpending.transactionCount} txn{regionSpending.transactionCount !== 1 ? 's' : ''}
                   </Text>
                 </View>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      </View>
 
-      {/* Floating Quick Date Filter (Left Side Overlay) */}
-      <View style={styles.dateFiltersWrapper}>
-        <GlassCard style={styles.dateCard}>
-          <Pressable
-            style={[styles.dateBtn, activeDateFilter === 'all' && styles.dateBtnActive]}
-            onPress={() => handleDateFilterSelect('all')}
+                {/* Divider */}
+                <View style={styles.statDivider} />
+
+                {/* Last 7 Days */}
+                <View style={styles.statColumn}>
+                  <Text style={styles.statLabel}>Last 7 Days</Text>
+                  <Text style={[styles.statAmount, { color: '#EF4444' }]}>
+                    {formatINR(regionSpending.last7DaysSpending)}
+                  </Text>
+                  <Text style={styles.statCount}>
+                    {regionSpending.last7DaysCount} txn{regionSpending.last7DaysCount !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+
+                {/* Divider */}
+                <View style={styles.statDivider} />
+
+                {/* Current Month */}
+                <View style={styles.statColumn}>
+                  <Text style={styles.statLabel}>This Month</Text>
+                  <Text style={[styles.statAmount, { color: '#10B981' }]}>
+                    {formatINR(regionSpending.currentMonthSpending)}
+                  </Text>
+                  <Text style={styles.statCount}>
+                    {regionSpending.currentMonthCount} txn{regionSpending.currentMonthCount !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+          </GlassCard>
+        </View>
+      )}
+
+      {/* Floating Top Category Scroll Selection (hidden when search result shown) */}
+      {!selectedPlace && (
+        <View style={styles.categoryFiltersWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryScrollContent}
           >
-            <Text style={[styles.dateBtnText, activeDateFilter === 'all' && styles.dateBtnTextActive]}>
-              All Time
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.dateBtn, activeDateFilter === 'week' && styles.dateBtnActive]}
-            onPress={() => handleDateFilterSelect('week')}
-          >
-            <Text style={[styles.dateBtnText, activeDateFilter === 'week' && styles.dateBtnTextActive]}>
-              7 Days
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.dateBtn, activeDateFilter === 'month' && styles.dateBtnActive]}
-            onPress={() => handleDateFilterSelect('month')}
-          >
-            <Text style={[styles.dateBtnText, activeDateFilter === 'month' && styles.dateBtnTextActive]}>
-              30 Days
-            </Text>
-          </Pressable>
-        </GlassCard>
-      </View>
+            <Pressable
+              style={[
+                styles.filterBadge,
+                mapFilters.category_id === null && styles.filterBadgeActive,
+              ]}
+              onPress={() => handleCategorySelect(null)}
+            >
+              <Text
+                style={[
+                  styles.badgeText,
+                  mapFilters.category_id === null && styles.badgeTextActive,
+                ]}
+              >
+                All Categories
+              </Text>
+            </Pressable>
+
+            {categories.map((cat) => {
+              const isSelected = mapFilters.category_id === cat.id;
+              return (
+                <Pressable
+                  key={cat.id}
+                  style={[
+                    styles.filterBadge,
+                    isSelected && {
+                      backgroundColor: cat.color,
+                      borderColor: cat.color,
+                    },
+                  ]}
+                  onPress={() => handleCategorySelect(cat.id)}
+                >
+                  <View style={styles.badgeInner}>
+                    <Text
+                      style={[
+                        styles.badgeText,
+                        isSelected && styles.badgeTextActive,
+                      ]}
+                    >
+                      {cat.name}
+                    </Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Floating Quick Date Filter (Right Side Overlay) — hidden during region view */}
+      {!selectedPlace && (
+        <View style={styles.dateFiltersWrapper}>
+          <GlassCard style={styles.dateCard}>
+            <Pressable
+              style={[styles.dateBtn, activeDateFilter === 'all' && styles.dateBtnActive]}
+              onPress={() => handleDateFilterSelect('all')}
+            >
+              <Text style={[styles.dateBtnText, activeDateFilter === 'all' && styles.dateBtnTextActive]}>
+                All Time
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.dateBtn, activeDateFilter === 'week' && styles.dateBtnActive]}
+              onPress={() => handleDateFilterSelect('week')}
+            >
+              <Text style={[styles.dateBtnText, activeDateFilter === 'week' && styles.dateBtnTextActive]}>
+                7 Days
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.dateBtn, activeDateFilter === 'month' && styles.dateBtnActive]}
+              onPress={() => handleDateFilterSelect('month')}
+            >
+              <Text style={[styles.dateBtnText, activeDateFilter === 'month' && styles.dateBtnTextActive]}>
+                30 Days
+              </Text>
+            </Pressable>
+          </GlassCard>
+        </View>
+      )}
 
       {/* Floating Collapsible Bottom Slide-over Drawer for Transactions logs */}
       <View style={[styles.drawerContainer, !showDrawer && styles.drawerCollapsed]}>
@@ -264,56 +497,144 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
   },
-  floatingHeaderWrapper: {
+
+  // ── Search Bar ──────────────────────────────────────────────────────
+  searchWrapper: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
-    left: 20,
-    right: 20,
-    zIndex: 10,
-    shadowColor: '#8B5CF6',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
+    top: Platform.OS === 'ios' ? 56 : 36,
+    left: 16,
+    right: 16,
+    zIndex: 20,
   },
-  floatingHeaderCard: {
+  searchCard: {
+    padding: 0,
+    borderRadius: 14,
+  },
+  searchInputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 20,
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === 'web' ? 10 : 6,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#F3F4F6',
+    fontWeight: '500',
+    paddingVertical: Platform.OS === 'web' ? 4 : 8,
+    ...Platform.select({
+      web: { outlineStyle: 'none' } as any,
+    }),
+  },
+
+  // ── Autocomplete Dropdown ───────────────────────────────────────────
+  autocompleteDropdown: {
+    marginTop: 4,
+    backgroundColor: 'rgba(11, 15, 25, 0.96)',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.35)',
+    borderColor: 'rgba(139, 92, 246, 0.2)',
+    overflow: 'hidden',
+    ...Platform.select({
+      web: {
+        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+      },
+    }),
   },
-  headerIconWrapper: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-    justifyContent: 'center',
+  autocompleteItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
-  headerTextWrapper: {
+  autocompleteText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#D1D5DB',
+    lineHeight: 18,
+  },
+
+  // ── Region Spending Summary ─────────────────────────────────────────
+  regionSummaryWrapper: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 118 : 98,
+    left: 16,
+    right: 16,
+    zIndex: 15,
+  },
+  regionSummaryCard: {
+    padding: 16,
+    borderRadius: 16,
+  },
+  regionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  regionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    marginRight: 12,
+  },
+  regionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#F3F4F6',
     flex: 1,
   },
-  headerSub: {
-    fontSize: 12,
-    textTransform: 'uppercase',
+  regionLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  regionLoadingText: {
+    fontSize: 13,
     color: '#9CA3AF',
-    letterSpacing: 1.2,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  statColumn: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 10,
     fontWeight: '700',
-    marginBottom: 4,
+    color: '#6B7280',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 6,
   },
-  headerMain: {
-    fontSize: 28,
+  statAmount: {
+    fontSize: 16,
     fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
+    marginBottom: 2,
   },
+  statCount: {
+    fontSize: 10,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignSelf: 'center',
+  },
+
+  // ── Category Filters (existing) ────────────────────────────────────
   categoryFiltersWrapper: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : 40,
+    top: Platform.OS === 'ios' ? 118 : 98,
     left: 0,
     right: 0,
     zIndex: 10,
@@ -350,9 +671,11 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '700',
   },
+
+  // ── Date Filters (existing) ────────────────────────────────────────
   dateFiltersWrapper: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 120 : 100,
+    top: Platform.OS === 'ios' ? 176 : 156,
     right: 20,
     zIndex: 10,
   },
@@ -380,6 +703,8 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
   },
+
+  // ── Bottom Drawer (existing) ───────────────────────────────────────
   drawerContainer: {
     position: 'absolute',
     bottom: 0,

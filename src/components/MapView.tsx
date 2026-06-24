@@ -21,6 +21,7 @@ interface MapViewProps {
   interactive?: boolean;
   selectedPin?: { latitude: number; longitude: number } | null;
   userLocation?: { latitude: number; longitude: number } | null;
+  region?: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number } | null;
 }
 
 export const MapView = ({
@@ -29,12 +30,15 @@ export const MapView = ({
   interactive = false,
   selectedPin = null,
   userLocation = null,
+  region = null,
 }: MapViewProps) => {
   const validLocations = locations.filter((loc: MapLocation) => loc.latitude && loc.longitude);
   const mapRef = useRef<NativeMap>(null);
 
   useEffect(() => {
-    if (selectedPin && mapRef.current) {
+    if (region && mapRef.current) {
+      mapRef.current.animateToRegion(region, 1000);
+    } else if (selectedPin && mapRef.current) {
       mapRef.current.animateToRegion({
         latitude: selectedPin.latitude,
         longitude: selectedPin.longitude,
@@ -49,7 +53,7 @@ export const MapView = ({
         longitudeDelta: 0.015,
       }, 1000);
     }
-  }, [selectedPin, userLocation]);
+  }, [selectedPin, userLocation, region]);
 
   const initialRegion = selectedPin
     ? {

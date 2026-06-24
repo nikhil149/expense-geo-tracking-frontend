@@ -20,6 +20,7 @@ interface MapViewProps {
   interactive?: boolean;
   selectedPin?: { latitude: number; longitude: number } | null;
   userLocation?: { latitude: number; longitude: number } | null;
+  region?: { latitude: number; longitude: number; latitudeDelta: number; longitudeDelta: number } | null;
 }
 
 export const MapView = ({
@@ -28,6 +29,7 @@ export const MapView = ({
   interactive = false,
   selectedPin = null,
   userLocation = null,
+  region = null,
 }: MapViewProps) => {
   const iframeRef = useRef<any>(null);
 
@@ -73,6 +75,25 @@ export const MapView = ({
     const timer = setTimeout(updateIframe, 400);
     return () => clearTimeout(timer);
   }, [validLocations, interactive, selectedPin, userLocation]);
+
+  // Fly to region when search result is selected
+  useEffect(() => {
+    if (!region || !iframeRef.current) return;
+    try {
+      iframeRef.current.contentWindow.postMessage(
+        {
+          type: 'FLY_TO_REGION',
+          lat: region.latitude,
+          lng: region.longitude,
+          latDelta: region.latitudeDelta,
+          lngDelta: region.longitudeDelta,
+        },
+        '*'
+      );
+    } catch (e) {
+      // Iframe might not be loaded yet
+    }
+  }, [region]);
 
   const baseLat = selectedPin?.latitude || userLocation?.latitude || (validLocations.length > 0 ? validLocations[0].latitude : 37.7749);
   const baseLng = selectedPin?.longitude || userLocation?.longitude || (validLocations.length > 0 ? validLocations[0].longitude : -122.4194);
@@ -218,6 +239,15 @@ export const MapView = ({
         window.addEventListener('message', function(event) {
           if (event.data && event.data.type === 'UPDATE_MARKERS') {
             renderMarkers(event.data.locations, event.data.interactive, event.data.selectedPin, event.data.userLocation);
+          }
+          if (event.data && event.data.type === 'FLY_TO_REGION') {
+            var lat = event.data.lat;
+            var lng = event.data.lng;
+            var latDelta = event.data.latDelta;
+            var lngDelta = event.data.lngDelta;
+            var southWest = L.latLng(lat - latDelta / 2, lng - lngDelta / 2);
+            var northEast = L.latLng(lat + latDelta / 2, lng + lngDelta / 2);
+            map.flyToBounds(L.latLngBounds(southWest, northEast), { animate: true, duration: 1.5, padding: [20, 20] });
           }
         });
       </script>

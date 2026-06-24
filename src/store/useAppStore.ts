@@ -77,6 +77,22 @@ interface MapFilters {
   endDate: string | null;
 }
 
+export interface RegionSpending {
+  totalSpending: number;
+  transactionCount: number;
+  last7DaysSpending: number;
+  last7DaysCount: number;
+  currentMonthSpending: number;
+  currentMonthCount: number;
+}
+
+export interface RegionBounds {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
+
 interface AppStoreState {
   // Auth state
   user: User | null;
@@ -92,6 +108,8 @@ interface AppStoreState {
   isLoading: boolean;
   error: string | null;
   mapFilters: MapFilters;
+  regionSpending: RegionSpending | null;
+  isRegionLoading: boolean;
 
   // Actions
   login: (email: string, password: string) => Promise<void>;
@@ -123,6 +141,9 @@ interface AppStoreState {
   fetchSummary: () => Promise<void>;
   fetchSpendingByCategory: (startDate?: string, endDate?: string) => Promise<void>;
   fetchSpendingLocations: () => Promise<void>;
+
+  fetchRegionSpending: (bounds: RegionBounds) => Promise<void>;
+  clearRegionSpending: () => void;
 
   loadAllData: () => Promise<void>;
 }
@@ -185,6 +206,8 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     startDate: null,
     endDate: null,
   },
+  regionSpending: null,
+  isRegionLoading: false,
 
   initializeAuth: async () => {
     const token = await getStorageItem('auth_token');
@@ -652,6 +675,32 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     } catch (err: any) {
       set({ error: err.message });
     }
+  },
+
+  fetchRegionSpending: async (bounds) => {
+    set({ isRegionLoading: true });
+    try {
+      const queryParams = new URLSearchParams({
+        minLat: String(bounds.minLat),
+        maxLat: String(bounds.maxLat),
+        minLng: String(bounds.minLng),
+        maxLng: String(bounds.maxLng),
+      });
+      const res = await fetch(`${API_BASE_URL}/analytics/spending-by-region?${queryParams.toString()}`, {
+        headers: getAuthHeaders(get().token),
+      });
+      if (!res.ok) throw new Error('Failed to fetch region spending');
+      const data = await res.json();
+      set({ regionSpending: data });
+    } catch (err: any) {
+      set({ error: err.message });
+    } finally {
+      set({ isRegionLoading: false });
+    }
+  },
+
+  clearRegionSpending: () => {
+    set({ regionSpending: null });
   },
 
   loadAllData: async () => {
