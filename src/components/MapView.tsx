@@ -18,6 +18,7 @@ interface MapLocation {
 interface MapViewProps {
   locations: MapLocation[];
   onPinSelect?: (coords: { latitude: number; longitude: number; location_name?: string }) => void;
+  onBoundsChange?: (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => void;
   interactive?: boolean;
   selectedPin?: { latitude: number; longitude: number } | null;
   userLocation?: { latitude: number; longitude: number } | null;
@@ -27,6 +28,7 @@ interface MapViewProps {
 export const MapView = ({
   locations,
   onPinSelect,
+  onBoundsChange,
   interactive = false,
   selectedPin = null,
   userLocation = null,
@@ -85,6 +87,16 @@ export const MapView = ({
       onPress={handlePress}
       showsUserLocation={false}
       showsMyLocationButton={false}
+      onRegionChangeComplete={(r: any) => {
+        if (onBoundsChange) {
+          onBoundsChange({
+            minLat: r.latitude - r.latitudeDelta / 2,
+            maxLat: r.latitude + r.latitudeDelta / 2,
+            minLng: r.longitude - r.longitudeDelta / 2,
+            maxLng: r.longitude + r.longitudeDelta / 2,
+          });
+        }
+      }}
     >
       {validLocations.map((loc: MapLocation) => (
         <NativeMarker

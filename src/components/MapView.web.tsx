@@ -17,6 +17,7 @@ interface MapLocation {
 interface MapViewProps {
   locations: MapLocation[];
   onPinSelect?: (coords: { latitude: number; longitude: number; location_name?: string }) => void;
+  onBoundsChange?: (bounds: { minLat: number; maxLat: number; minLng: number; maxLng: number }) => void;
   interactive?: boolean;
   selectedPin?: { latitude: number; longitude: number } | null;
   userLocation?: { latitude: number; longitude: number } | null;
@@ -26,6 +27,7 @@ interface MapViewProps {
 export const MapView = ({
   locations,
   onPinSelect,
+  onBoundsChange,
   interactive = false,
   selectedPin = null,
   userLocation = null,
@@ -45,11 +47,16 @@ export const MapView = ({
           onPinSelect({ latitude: lat, longitude: lng, location_name: 'Dropped Pin' });
         }
       }
+      if (event.data && event.data.type === 'BOUNDS_CHANGE') {
+        if (onBoundsChange) {
+          onBoundsChange(event.data.bounds);
+        }
+      }
     };
 
     window.addEventListener('message', handleMapMessage);
     return () => window.removeEventListener('message', handleMapMessage);
-  }, [onPinSelect]);
+  }, [onPinSelect, onBoundsChange]);
 
   // Update Web Leaflet Map markers when props change
   useEffect(() => {
@@ -235,6 +242,23 @@ export const MapView = ({
             lng: e.latlng.lng
           }, '*');
         });
+
+        function emitBounds() {
+          var b = map.getBounds();
+          window.parent.postMessage({
+            type: 'BOUNDS_CHANGE',
+            bounds: {
+              minLat: b.getSouth(),
+              maxLat: b.getNorth(),
+              minLng: b.getWest(),
+              maxLng: b.getEast()
+            }
+          }, '*');
+        }
+        map.on('moveend', emitBounds);
+        map.on('zoomend', emitBounds);
+        // Emit initial bounds after map loads
+        setTimeout(emitBounds, 600);
 
         window.addEventListener('message', function(event) {
           if (event.data && event.data.type === 'UPDATE_MARKERS') {

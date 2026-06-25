@@ -63,6 +63,11 @@ export const SpendingMap: React.FC<SpendingMapProps> = ({ onEditTransactionPress
   } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Viewport Bounds State (for visible-on-map total) ───────────────
+  const [viewportBounds, setViewportBounds] = useState<{
+    minLat: number; maxLat: number; minLng: number; maxLng: number;
+  } | null>(null);
+
   useEffect(() => {
     fetchSpendingLocations();
   }, []);
@@ -164,8 +169,21 @@ export const SpendingMap: React.FC<SpendingMapProps> = ({ onEditTransactionPress
     setMapFilters({ category_id: categoryId });
   };
 
-  // Calculate total amount representing visible map coordinates
-  const totalOnMap = mapLocations.reduce((sum, loc) => sum + (loc.type === 'expense' ? loc.amount : 0), 0);
+  // Calculate total of transactions visible in current viewport
+  const visibleLocations = viewportBounds
+    ? mapLocations.filter((loc) => {
+        if (!loc.latitude || !loc.longitude) return false;
+        return (
+          loc.latitude >= viewportBounds.minLat &&
+          loc.latitude <= viewportBounds.maxLat &&
+          loc.longitude >= viewportBounds.minLng &&
+          loc.longitude <= viewportBounds.maxLng
+        );
+      })
+    : mapLocations.filter((loc) => loc.latitude && loc.longitude);
+
+  const visibleTotal = visibleLocations.reduce((sum, loc) => sum + loc.amount, 0);
+  const visibleCount = visibleLocations.length;
 
   // Format currency
   const formatINR = (amount: number) =>
@@ -175,8 +193,32 @@ export const SpendingMap: React.FC<SpendingMapProps> = ({ onEditTransactionPress
     <View style={styles.container}>
       {/* Full screen Polymorphic Map */}
       <View style={styles.mapContainer}>
-        <MapView locations={mapLocations} region={mapRegion} />
+        <MapView
+          locations={mapLocations}
+          region={mapRegion}
+          onBoundsChange={setViewportBounds}
+        />
       </View>
+
+      {/* ── Floating Viewport Total Badge ───────────────────────────── */}
+      {visibleCount > 0 && !selectedPlace && (
+        <View style={styles.viewportTotalWrapper}>
+          <GlassCard
+            style={styles.viewportTotalCard}
+            backgroundColor="rgba(11, 15, 25, 0.9)"
+            borderColor="rgba(139, 92, 246, 0.25)"
+          >
+            <Icons.Eye size={14} color="#8B5CF6" style={{ marginRight: 6 }} />
+            <Text style={styles.viewportTotalText}>
+              {visibleCount} txn{visibleCount !== 1 ? 's' : ''} in view
+            </Text>
+            <View style={styles.viewportDot} />
+            <Text style={styles.viewportTotalAmount}>
+              {formatINR(visibleTotal)}
+            </Text>
+          </GlassCard>
+        </View>
+      )}
 
       {/* ── Floating Search Bar ─────────────────────────────────────── */}
       <View style={styles.searchWrapper}>
@@ -392,7 +434,7 @@ export const SpendingMap: React.FC<SpendingMapProps> = ({ onEditTransactionPress
           <View style={styles.handleIndicator} />
           <View style={styles.drawerTitleRow}>
             <Text style={styles.drawerTitle}>
-              Visible Locations ({mapLocations.length})
+              Visible Locations ({visibleCount})
             </Text>
             <Icons.ChevronDown
               size={18}
@@ -496,6 +538,39 @@ const styles = StyleSheet.create({
     right: 0,
     top: 0,
     bottom: 0,
+  },
+
+  // ── Viewport Total Badge ───────────────────────────────────────────
+  viewportTotalWrapper: {
+    position: 'absolute',
+    bottom: Platform.OS === 'ios' ? 180 : 160,
+    left: 16,
+    zIndex: 12,
+  },
+  viewportTotalCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    padding: 0,
+  },
+  viewportTotalText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+    fontWeight: '600',
+  },
+  viewportDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#6B7280',
+    marginHorizontal: 8,
+  },
+  viewportTotalAmount: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#F3F4F6',
   },
 
   // ── Search Bar ──────────────────────────────────────────────────────
