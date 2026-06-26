@@ -200,26 +200,6 @@ export const SpendingMap: React.FC<SpendingMapProps> = ({ onEditTransactionPress
         />
       </View>
 
-      {/* ── Floating Viewport Total Badge ───────────────────────────── */}
-      {visibleCount > 0 && !selectedPlace && (
-        <View style={styles.viewportTotalWrapper}>
-          <GlassCard
-            style={styles.viewportTotalCard}
-            backgroundColor="rgba(11, 15, 25, 0.9)"
-            borderColor="rgba(139, 92, 246, 0.25)"
-          >
-            <Icons.Eye size={14} color="#8B5CF6" style={{ marginRight: 6 }} />
-            <Text style={styles.viewportTotalText}>
-              {visibleCount} txn{visibleCount !== 1 ? 's' : ''} in view
-            </Text>
-            <View style={styles.viewportDot} />
-            <Text style={styles.viewportTotalAmount}>
-              {formatINR(visibleTotal)}
-            </Text>
-          </GlassCard>
-        </View>
-      )}
-
       {/* ── Floating Search Bar ─────────────────────────────────────── */}
       <View style={styles.searchWrapper}>
         <GlassCard
@@ -433,9 +413,18 @@ export const SpendingMap: React.FC<SpendingMapProps> = ({ onEditTransactionPress
         <Pressable style={styles.drawerHandle} onPress={() => setShowDrawer(!showDrawer)}>
           <View style={styles.handleIndicator} />
           <View style={styles.drawerTitleRow}>
-            <Text style={styles.drawerTitle}>
-              Visible Locations ({visibleCount})
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.drawerTitle}>
+                Visible Locations ({visibleCount})
+              </Text>
+              {visibleCount > 0 && !selectedPlace && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(16, 185, 129, 0.1)', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#10B981' }}>
+                    {formatINR(visibleTotal)}
+                  </Text>
+                </View>
+              )}
+            </View>
             <Icons.ChevronDown
               size={18}
               color="#9CA3AF"
@@ -540,38 +529,6 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
 
-  // ── Viewport Total Badge ───────────────────────────────────────────
-  viewportTotalWrapper: {
-    position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 180 : 160,
-    left: 16,
-    zIndex: 12,
-  },
-  viewportTotalCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    padding: 0,
-  },
-  viewportTotalText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    fontWeight: '600',
-  },
-  viewportDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#6B7280',
-    marginHorizontal: 8,
-  },
-  viewportTotalAmount: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#F3F4F6',
-  },
 
   // ── Search Bar ──────────────────────────────────────────────────────
   searchWrapper: {
