@@ -182,7 +182,7 @@ export const SpendingMap: React.FC<SpendingMapProps> = ({ onEditTransactionPress
       })
     : mapLocations.filter((loc) => loc.latitude && loc.longitude);
 
-  const visibleTotal = visibleLocations.reduce((sum, loc) => sum + loc.amount, 0);
+  const visibleTotal = visibleLocations.reduce((sum, loc) => sum + Number(loc.amount || 0), 0);
   const visibleCount = visibleLocations.length;
 
   // Format currency
