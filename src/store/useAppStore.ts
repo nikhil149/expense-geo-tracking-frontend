@@ -15,7 +15,7 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__
 
 export interface User {
   id: number;
-  email: string;
+  phone_number: string;
   name: string;
 }
 
@@ -112,13 +112,10 @@ interface AppStoreState {
   isRegionLoading: boolean;
 
   // Actions
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  sendOtp: (phone_number: string) => Promise<void>;
+  verifyOtp: (phone_number: string, otp_code: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
-  forgotPassword: (email: string) => Promise<string>;
-  verifyCode: (email: string, code: string) => Promise<string>;
-  resetPassword: (email: string, code: string, newPassword: string) => Promise<string>;
   initializeAuth: () => Promise<void>;
 
   setMapFilters: (filters: Partial<MapFilters>) => void;
@@ -221,16 +218,39 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }
   },
 
-  login: async (email, password) => {
+  sendOtp: async (phone_number) => {
     set({ isLoading: true, error: null });
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      const res = await fetch(`${API_BASE_URL}/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ phone_number }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Login failed');
+      if (!res.ok) throw new Error(data.error || 'Failed to send OTP');
+    } catch (err: any) {
+      set({ error: err.message });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  verifyOtp: async (phone_number, otp_code, name) => {
+    set({ isLoading: true, error: null });
+    try {
+      const res = await fetch(`${API_BASE_URL}/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone_number, otp_code, name }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // If it returns a specific error about needing a name, we throw that so UI can handle it.
+        const error: any = new Error(data.error || 'Verification failed');
+        error.isNewUser = data.isNewUser;
+        throw error;
+      }
 
       await setStorageItem('auth_token', data.token);
       await setStorageItem('auth_user', JSON.stringify(data.user));
@@ -252,36 +272,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }
   },
 
-  register: async (email, password, name) => {
-    set({ isLoading: true, error: null });
-    try {
-      const res = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Registration failed');
 
-      await setStorageItem('auth_token', data.token);
-      await setStorageItem('auth_user', JSON.stringify(data.user));
-
-      set({
-        token: data.token,
-        user: data.user,
-        isAuthenticated: true,
-        error: null
-      });
-
-      // Fetch user data
-      await get().loadAllData();
-    } catch (err: any) {
-      set({ error: err.message });
-      throw err;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
 
   logout: async () => {
     await setStorageItem('auth_token', null);
@@ -328,62 +319,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     }
   },
 
-  forgotPassword: async (email: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to send code');
-      return data.message;
-    } catch (err: any) {
-      set({ error: err.message });
-      throw err;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
 
-  verifyCode: async (email: string, code: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/verify-code`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Invalid code');
-      return data.message;
-    } catch (err: any) {
-      set({ error: err.message });
-      throw err;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
-
-  resetPassword: async (email: string, code: string, newPassword: string) => {
-    set({ isLoading: true, error: null });
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, code, newPassword }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to reset password');
-      return data.message;
-    } catch (err: any) {
-      set({ error: err.message });
-      throw err;
-    } finally {
-      set({ isLoading: false });
-    }
-  },
 
   setMapFilters: (filters) => {
     set((state) => ({

@@ -15,18 +15,15 @@ import { GlassCard } from '../components/GlassCard';
 import * as LucideIcons from 'lucide-react-native';
 const Icons = LucideIcons as any;
 
-type AuthMode = 'login' | 'register' | 'forgot' | 'verify' | 'resetPassword';
+type AuthMode = 'login' | 'register' | 'verify';
 
 export const AuthScreen: React.FC = () => {
-  const { login, register, forgotPassword, verifyCode, resetPassword, isLoading, error } = useAppStore();
+  const { sendOtp, verifyOtp, isLoading, error } = useAppStore();
 
   const [mode, setMode] = useState<AuthMode>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [localError, setLocalError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -35,112 +32,62 @@ export const AuthScreen: React.FC = () => {
     setSuccessMsg(null);
   };
 
-  const handleLoginSubmit = async () => {
+  const handleSendOtp = async () => {
     clearState();
-    if (!email || !password) {
-      setLocalError('Please fill in email and password.');
+    if (!phoneNumber) {
+      setLocalError('Please enter your phone number.');
       return;
     }
-    try {
-      await login(email, password);
-    } catch (err: any) { /* handled by store */ }
-  };
+    if (mode === 'register' && !name) {
+      setLocalError('Please enter your full name.');
+      return;
+    }
 
-  const handleRegisterSubmit = async () => {
-    clearState();
-    if (!email || !password || !name) {
-      setLocalError('Please fill in all fields.');
-      return;
-    }
     try {
-      await register(email, password, name);
-    } catch (err: any) { /* handled by store */ }
-  };
-
-  const handleForgotSubmit = async () => {
-    clearState();
-    if (!email) {
-      setLocalError('Please enter your email address.');
-      return;
-    }
-    try {
-      const msg = await forgotPassword(email);
-      setSuccessMsg('Verification code sent! Check your email.');
+      await sendOtp(phoneNumber);
+      setSuccessMsg('Verification code sent!');
       setMode('verify');
     } catch (err: any) {
       setLocalError(err.message);
     }
   };
 
-  const handleVerifySubmit = async () => {
+  const handleVerifyOtp = async () => {
     clearState();
     if (!code || code.length !== 6) {
       setLocalError('Please enter the 6-digit code.');
       return;
     }
     try {
-      await verifyCode(email, code);
-      setSuccessMsg('Code verified! Set your new password.');
-      setMode('resetPassword');
+      await verifyOtp(phoneNumber, code, name);
     } catch (err: any) {
       setLocalError(err.message);
-    }
-  };
-
-  const handleResetSubmit = async () => {
-    clearState();
-    if (!newPassword || !confirmPassword) {
-      setLocalError('Please fill in both password fields.');
-      return;
-    }
-    if (newPassword.length < 6) {
-      setLocalError('Password must be at least 6 characters.');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setLocalError('Passwords do not match.');
-      return;
-    }
-    try {
-      await resetPassword(email, code, newPassword);
-      setSuccessMsg('Password reset successfully! You can now log in.');
-      setMode('login');
-      setPassword('');
-      setCode('');
-      setNewPassword('');
-      setConfirmPassword('');
-    } catch (err: any) {
-      setLocalError(err.message);
+      if (err.isNewUser) {
+        // If they tried to log in but don't exist, we send them to register
+        setLocalError('Account not found. Please register.');
+        setMode('register');
+      }
     }
   };
 
   const switchTo = (target: AuthMode) => {
     setMode(target);
     clearState();
-    if (target === 'login' || target === 'register') {
-      setCode('');
-      setNewPassword('');
-      setConfirmPassword('');
-    }
+    setCode('');
   };
 
   const activeError = error || localError;
 
-  // Card titles and subtitles per mode
   const titles: Record<AuthMode, string> = {
     login: 'Sign In to Hub',
-    register: 'Register Account',
-    forgot: 'Forgot Password',
+    register: 'Create Account',
     verify: 'Enter Verification Code',
-    resetPassword: 'Set New Password',
   };
 
   const subtitles: Record<AuthMode, string> = {
     login: 'Welcome back! Log in to view your ledger.',
     register: 'Join and start tracking geospatial transactions.',
-    forgot: 'Enter your email to receive a 6-digit verification code.',
-    verify: `We sent a code to ${email}. Enter it below.`,
-    resetPassword: 'Choose a strong new password for your account.',
+    verify: `We sent a code to ${phoneNumber}. Enter it below.`,
   };
 
   return (
@@ -180,110 +127,37 @@ export const AuthScreen: React.FC = () => {
           )}
 
           <View style={styles.form}>
-            {/* --- LOGIN MODE --- */}
-            {mode === 'login' && (
-              <>
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.label}>Email Address</Text>
-                  <View style={styles.inputContainer}>
-                    <Icons.Mail size={18} color="#9CA3AF" style={styles.inputIcon} />
-                    <TextInput
-                      placeholder="nikhil@example.com"
-                      placeholderTextColor="#6B7280"
-                      value={email}
-                      onChangeText={setEmail}
-                      keyboardType="email-address"
-                      style={styles.input}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.label}>Password</Text>
-                  <View style={styles.inputContainer}>
-                    <Icons.Lock size={18} color="#9CA3AF" style={styles.inputIcon} />
-                    <TextInput
-                      placeholder="••••••••"
-                      placeholderTextColor="#6B7280"
-                      secureTextEntry
-                      value={password}
-                      onChangeText={setPassword}
-                      style={styles.input}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-                </View>
-
-                {/* Forgot Password Link */}
-                <Pressable onPress={() => switchTo('forgot')} style={styles.forgotBtn}>
-                  <Text style={styles.forgotBtnText}>Forgot Password?</Text>
-                </Pressable>
-
-                <Pressable
-                  style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.8 }]}
-                  onPress={handleLoginSubmit}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <Text style={styles.submitBtnText}>Authenticate</Text>
-                      <Icons.ArrowRight size={16} color="#FFFFFF" />
-                    </>
-                  )}
-                </Pressable>
-              </>
-            )}
-
             {/* --- REGISTER MODE --- */}
             {mode === 'register' && (
+              <View style={styles.inputWrapper}>
+                <Text style={styles.label}>Full Name</Text>
+                <View style={styles.inputContainer}>
+                  <Icons.User size={18} color="#9CA3AF" style={styles.inputIcon} />
+                  <TextInput
+                    placeholder="Nikhil Rachawar"
+                    placeholderTextColor="#6B7280"
+                    value={name}
+                    onChangeText={setName}
+                    style={styles.input}
+                    autoCapitalize="words"
+                  />
+                </View>
+              </View>
+            )}
+
+            {/* --- ENTRY MODES --- */}
+            {(mode === 'login' || mode === 'register') && (
               <>
                 <View style={styles.inputWrapper}>
-                  <Text style={styles.label}>Full Name</Text>
+                  <Text style={styles.label}>Phone Number</Text>
                   <View style={styles.inputContainer}>
-                    <Icons.User size={18} color="#9CA3AF" style={styles.inputIcon} />
+                    <Icons.Phone size={18} color="#9CA3AF" style={styles.inputIcon} />
                     <TextInput
-                      placeholder="Nikhil Rachawar"
+                      placeholder="+1234567890"
                       placeholderTextColor="#6B7280"
-                      value={name}
-                      onChangeText={setName}
-                      style={styles.input}
-                      autoCapitalize="words"
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.label}>Email Address</Text>
-                  <View style={styles.inputContainer}>
-                    <Icons.Mail size={18} color="#9CA3AF" style={styles.inputIcon} />
-                    <TextInput
-                      placeholder="nikhil@example.com"
-                      placeholderTextColor="#6B7280"
-                      value={email}
-                      onChangeText={setEmail}
-                      keyboardType="email-address"
-                      style={styles.input}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.label}>Password</Text>
-                  <View style={styles.inputContainer}>
-                    <Icons.Lock size={18} color="#9CA3AF" style={styles.inputIcon} />
-                    <TextInput
-                      placeholder="••••••••"
-                      placeholderTextColor="#6B7280"
-                      secureTextEntry
-                      value={password}
-                      onChangeText={setPassword}
+                      value={phoneNumber}
+                      onChangeText={setPhoneNumber}
+                      keyboardType="phone-pad"
                       style={styles.input}
                       autoCapitalize="none"
                       autoCorrect={false}
@@ -293,14 +167,14 @@ export const AuthScreen: React.FC = () => {
 
                 <Pressable
                   style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.8 }]}
-                  onPress={handleRegisterSubmit}
+                  onPress={handleSendOtp}
                   disabled={isLoading}
                 >
                   {isLoading ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
                     <>
-                      <Text style={styles.submitBtnText}>Get Started</Text>
+                      <Text style={styles.submitBtnText}>Send Code</Text>
                       <Icons.ArrowRight size={16} color="#FFFFFF" />
                     </>
                   )}
@@ -308,131 +182,36 @@ export const AuthScreen: React.FC = () => {
               </>
             )}
 
-            {/* --- FORGOT PASSWORD MODE --- */}
-            {mode === 'forgot' && (
-              <>
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.label}>Email Address</Text>
-                  <View style={styles.inputContainer}>
-                    <Icons.Mail size={18} color="#9CA3AF" style={styles.inputIcon} />
-                    <TextInput
-                      placeholder="nikhil@example.com"
-                      placeholderTextColor="#6B7280"
-                      value={email}
-                      onChangeText={setEmail}
-                      keyboardType="email-address"
-                      style={styles.input}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-                </View>
-
-                <Pressable
-                  style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.8 }]}
-                  onPress={handleForgotSubmit}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <Icons.Send size={16} color="#FFFFFF" />
-                      <Text style={styles.submitBtnText}>Send Verification Code</Text>
-                    </>
-                  )}
-                </Pressable>
-              </>
-            )}
-
-            {/* --- VERIFY CODE MODE --- */}
+            {/* --- VERIFY MODE --- */}
             {mode === 'verify' && (
               <>
                 <View style={styles.inputWrapper}>
-                  <Text style={styles.label}>6-Digit Verification Code</Text>
+                  <Text style={styles.label}>Verification Code</Text>
                   <View style={styles.inputContainer}>
-                    <Icons.KeyRound size={18} color="#9CA3AF" style={styles.inputIcon} />
+                    <Icons.Key size={18} color="#9CA3AF" style={styles.inputIcon} />
                     <TextInput
                       placeholder="123456"
                       placeholderTextColor="#6B7280"
                       value={code}
-                      onChangeText={(text) => setCode(text.replace(/[^0-9]/g, '').slice(0, 6))}
+                      onChangeText={setCode}
                       keyboardType="number-pad"
                       maxLength={6}
-                      style={[styles.input, { letterSpacing: 6, fontSize: 20, fontWeight: '700' }]}
+                      style={styles.input}
                     />
                   </View>
                 </View>
 
                 <Pressable
                   style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.8 }]}
-                  onPress={handleVerifySubmit}
+                  onPress={handleVerifyOtp}
                   disabled={isLoading}
                 >
                   {isLoading ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
                     <>
-                      <Icons.ShieldCheck size={16} color="#FFFFFF" />
-                      <Text style={styles.submitBtnText}>Verify Code</Text>
-                    </>
-                  )}
-                </Pressable>
-
-                <Pressable onPress={handleForgotSubmit} style={styles.resendBtn}>
-                  <Text style={styles.resendBtnText}>Didn't receive it? Resend Code</Text>
-                </Pressable>
-              </>
-            )}
-
-            {/* --- RESET PASSWORD MODE --- */}
-            {mode === 'resetPassword' && (
-              <>
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.label}>New Password</Text>
-                  <View style={styles.inputContainer}>
-                    <Icons.Lock size={18} color="#9CA3AF" style={styles.inputIcon} />
-                    <TextInput
-                      placeholder="••••••••"
-                      placeholderTextColor="#6B7280"
-                      secureTextEntry
-                      value={newPassword}
-                      onChangeText={setNewPassword}
-                      style={styles.input}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.inputWrapper}>
-                  <Text style={styles.label}>Confirm New Password</Text>
-                  <View style={styles.inputContainer}>
-                    <Icons.LockKeyhole size={18} color="#9CA3AF" style={styles.inputIcon} />
-                    <TextInput
-                      placeholder="••••••••"
-                      placeholderTextColor="#6B7280"
-                      secureTextEntry
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                      style={styles.input}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
-                </View>
-
-                <Pressable
-                  style={({ pressed }) => [styles.submitBtn, pressed && { opacity: 0.8 }]}
-                  onPress={handleResetSubmit}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <Icons.Save size={16} color="#FFFFFF" />
-                      <Text style={styles.submitBtnText}>Reset Password</Text>
+                      <Text style={styles.submitBtnText}>Verify & Continue</Text>
+                      <Icons.Check size={16} color="#FFFFFF" />
                     </>
                   )}
                 </Pressable>
@@ -441,30 +220,29 @@ export const AuthScreen: React.FC = () => {
           </View>
         </GlassCard>
 
-        {/* Toggle Footer */}
-        {(mode === 'login' || mode === 'register') && (
-          <Pressable
-            style={styles.toggleFooter}
-            onPress={() => switchTo(mode === 'login' ? 'register' : 'login')}
-          >
-            <Text style={styles.toggleText}>
-              {mode === 'login' ? "Don't have an account? " : "Already registered? "}
-              <Text style={styles.toggleTextHighlight}>
-                {mode === 'login' ? 'Sign Up' : 'Log In'}
+        {/* Toggle Login/Register footer */}
+        <View style={styles.footer}>
+          {mode === 'login' ? (
+            <Text style={styles.footerText}>
+              Don't have an account?{' '}
+              <Text style={styles.footerLink} onPress={() => switchTo('register')}>
+                Register here
               </Text>
             </Text>
-          </Pressable>
-        )}
-
-        {/* Back to Login from forgot/verify/reset screens */}
-        {(mode === 'forgot' || mode === 'verify' || mode === 'resetPassword') && (
-          <Pressable style={styles.toggleFooter} onPress={() => switchTo('login')}>
-            <Text style={styles.toggleText}>
-              Remember your password?{' '}
-              <Text style={styles.toggleTextHighlight}>Back to Login</Text>
+          ) : mode === 'register' ? (
+            <Text style={styles.footerText}>
+              Already have an account?{' '}
+              <Text style={styles.footerLink} onPress={() => switchTo('login')}>
+                Sign in here
+              </Text>
             </Text>
-          </Pressable>
-        )}
+          ) : (
+            <Pressable onPress={() => switchTo('login')} style={styles.backBtn}>
+              <Icons.ArrowLeft size={16} color="#9CA3AF" />
+              <Text style={styles.backBtnText}>Back to Sign In</Text>
+            </Pressable>
+          )}
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -473,17 +251,17 @@ export const AuthScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0B0F19',
+    backgroundColor: '#0B0F19', // Dark premium background
   },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 24,
-    paddingTop: 60,
   },
   brandContainer: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 40,
   },
   logoBox: {
     width: 64,
@@ -492,185 +270,145 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(139, 92, 246, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: 'rgba(139, 92, 246, 0.2)',
-    marginBottom: 16,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 0 20px rgba(139, 92, 246, 0.25)',
-      },
-    }),
   },
   brandName: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 2,
-  },
-  brandSub: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 4,
-  },
-  card: {
-    padding: 24,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-  },
-  cardTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '800',
     color: '#FFFFFF',
+    letterSpacing: 2,
+    marginBottom: 8,
+  },
+  brandSub: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    letterSpacing: 0.5,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 400,
+    padding: 32,
+    borderRadius: 24,
+  },
+  cardTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
   },
   cardSubtitle: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#9CA3AF',
-    marginTop: 6,
-    lineHeight: 18,
+    marginBottom: 32,
+    lineHeight: 20,
   },
-  successContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 16,
+  form: {
+    gap: 20,
+  },
+  inputWrapper: {
     gap: 8,
   },
-  successText: {
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#D1D5DB',
+    marginLeft: 4,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(17, 24, 39, 0.8)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(55, 65, 81, 0.8)',
+    paddingHorizontal: 16,
+    height: 52,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
     flex: 1,
-    color: '#6EE7B7',
-    fontSize: 12,
-    fontWeight: '500',
+    color: '#FFFFFF',
+    fontSize: 16,
+    height: '100%',
+  },
+  submitBtn: {
+    backgroundColor: '#8B5CF6',
+    borderRadius: 12,
+    height: 52,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    shadowColor: '#8B5CF6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  submitBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    marginRight: 8,
   },
   errorContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.2)',
-    borderRadius: 12,
-    padding: 12,
-    marginTop: 16,
-    gap: 8,
   },
   errorIcon: {
-    flexShrink: 0,
+    marginRight: 8,
   },
   errorText: {
-    flex: 1,
     color: '#FCA5A5',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  form: {
-    marginTop: 20,
-    gap: 16,
-  },
-  inputWrapper: {
-    gap: 6,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#D1D5DB',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 12,
-    height: 48,
-    paddingHorizontal: 12,
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    color: '#F3F4F6',
     fontSize: 14,
-    height: '100%',
-    ...Platform.select({
-      web: {
-        outlineStyle: 'none' as any,
-      },
-    }),
+    flex: 1,
   },
-  forgotBtn: {
-    alignSelf: 'flex-end',
-    marginTop: -8,
-    ...Platform.select({
-      web: { cursor: 'pointer' },
-    }),
+  successContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
   },
-  forgotBtnText: {
+  successText: {
+    color: '#6EE7B7',
+    fontSize: 14,
+    flex: 1,
+  },
+  footer: {
+    marginTop: 32,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+  },
+  footerLink: {
     color: '#8B5CF6',
-    fontSize: 12,
     fontWeight: '600',
   },
-  resendBtn: {
-    alignSelf: 'center',
-    marginTop: -4,
-    ...Platform.select({
-      web: { cursor: 'pointer' },
-    }),
-  },
-  resendBtnText: {
-    color: '#9CA3AF',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  submitBtn: {
+  backBtn: {
     flexDirection: 'row',
-    height: 48,
-    backgroundColor: '#8B5CF6',
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-    gap: 8,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#8B5CF6',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 4,
-      },
-      web: {
-        cursor: 'pointer',
-        boxShadow: '0 4px 15px rgba(139, 92, 246, 0.3)',
-      },
-    }),
-  },
-  submitBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  toggleFooter: {
-    marginTop: 24,
     alignItems: 'center',
     padding: 8,
-    ...Platform.select({
-      web: {
-        cursor: 'pointer',
-      },
-    }),
   },
-  toggleText: {
+  backBtnText: {
     color: '#9CA3AF',
-    fontSize: 13,
-  },
-  toggleTextHighlight: {
-    color: '#8B5CF6',
-    fontWeight: '700',
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
