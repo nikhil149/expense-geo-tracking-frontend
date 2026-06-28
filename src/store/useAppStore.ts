@@ -11,7 +11,7 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__
     ios: 'http://192.168.0.104:5001/api', // Use computer's actual LAN IP for physical iOS devices
     default: 'http://localhost:5001/api', // Web can safely use localhost
   })
-  : 'https://d29xz5ma6wsmg7.cloudfront.net/api');
+  : 'https://wxm1ud51uf.execute-api.ap-south-1.amazonaws.com');
 
 export interface User {
   id: number;
@@ -405,7 +405,7 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
         try {
           const errData = await res.json();
           if (errData.error) errMsg = errData.error;
-        } catch (e) {}
+        } catch (e) { }
         throw new Error(errMsg);
       }
       const newTx = await res.json();
