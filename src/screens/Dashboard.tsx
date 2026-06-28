@@ -10,6 +10,7 @@ import {
   Platform,
   Linking,
   Alert,
+  AppState,
 } from 'react-native';
 import { useAppStore } from '../store/useAppStore';
 import { GlassCard } from '../components/GlassCard';
@@ -127,17 +128,31 @@ export const Dashboard: React.FC<DashboardProps> = ({
       })();
     }
 
-    if (Platform.OS === 'android') {
-      try {
-        if (RNAndroidNotificationListener && RNAndroidNotificationListener.getPermissionStatus) {
-          RNAndroidNotificationListener.getPermissionStatus().then(status => {
-            setHasListenerPermission(status !== 'denied');
-          }).catch(() => setHasListenerPermission(false));
+    const checkPermission = () => {
+      if (Platform.OS === 'android') {
+        try {
+          if (RNAndroidNotificationListener && RNAndroidNotificationListener.getPermissionStatus) {
+            RNAndroidNotificationListener.getPermissionStatus().then(status => {
+              setHasListenerPermission(status !== 'denied');
+            }).catch(() => setHasListenerPermission(false));
+          }
+        } catch (e) {
+          console.warn('Native module missing for notification listener');
         }
-      } catch (e) {
-        console.warn('Native module missing for notification listener');
       }
-    }
+    };
+
+    checkPermission();
+
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active') {
+        checkPermission();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   const requestListenerPermission = () => {

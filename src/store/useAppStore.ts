@@ -141,6 +141,7 @@ interface AppStoreState {
 
   fetchRegionSpending: (bounds: RegionBounds) => Promise<void>;
   clearRegionSpending: () => void;
+  clearError: () => void;
 
   loadAllData: () => Promise<void>;
 }
@@ -637,6 +638,10 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
 
   clearRegionSpending: () => {
     set({ regionSpending: null });
+  },
+
+  clearError: () => {
+    set({ error: null });
   },
 
   loadAllData: async () => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -18,7 +18,7 @@ const Icons = LucideIcons as any;
 type AuthMode = 'login' | 'register' | 'verify';
 
 export const AuthScreen: React.FC = () => {
-  const { sendOtp, verifyOtp, isLoading, error } = useAppStore();
+  const { sendOtp, verifyOtp, isLoading, error, clearError } = useAppStore();
 
   const [mode, setMode] = useState<AuthMode>('login');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -77,6 +77,19 @@ export const AuthScreen: React.FC = () => {
   };
 
   const activeError = error || localError;
+
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    if (activeError || successMsg) {
+      timeoutId = setTimeout(() => {
+        clearState();
+        if (error) clearError();
+      }, 7000);
+    }
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [activeError, successMsg, error, clearError]);
 
   const titles: Record<AuthMode, string> = {
     login: 'Sign In to Hub',
