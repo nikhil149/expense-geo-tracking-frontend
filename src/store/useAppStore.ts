@@ -11,7 +11,7 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__
     ios: 'http://192.168.0.104:5001/api', // Use computer's actual LAN IP for physical iOS devices
     default: 'http://localhost:5001/api', // Web can safely use localhost
   })
-  : 'https://wxm1ud51uf.execute-api.ap-south-1.amazonaws.com');
+  : 'https://wxm1ud51uf.execute-api.ap-south-1.amazonaws.com/api');
 
 export interface User {
   id: number;
