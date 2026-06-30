@@ -16,7 +16,7 @@ function getBackgroundApiUrl(): string {
   }
   // In a headless background context we cannot rely on __DEV__ so always
   // use the production URL.
-  return 'https://d29xz5ma6wsmg7.cloudfront.net/api';
+  return 'https://wxm1ud51uf.execute-api.ap-south-1.amazonaws.com/api';
 }
 
 /**
