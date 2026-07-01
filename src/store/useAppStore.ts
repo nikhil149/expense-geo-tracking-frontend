@@ -7,8 +7,8 @@ import { Platform } from 'react-native';
 // Example: 'https://d1abc2def3ghij.cloudfront.net/api'
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || (__DEV__
   ? Platform.select({
-    android: 'http://192.168.0.104:5001/api', // Use computer's actual LAN IP for physical android devices
-    ios: 'http://192.168.0.104:5001/api', // Use computer's actual LAN IP for physical iOS devices
+    android: 'http://192.168.100.22:5001/api', // Use computer's actual LAN IP for physical android devices
+    ios: 'http://192.168.100.22:5001/api', // Use computer's actual LAN IP for physical iOS devices
     default: 'http://localhost:5001/api', // Web can safely use localhost
   })
   : 'https://wxm1ud51uf.execute-api.ap-south-1.amazonaws.com/api');
@@ -93,6 +93,15 @@ export interface RegionBounds {
   maxLng: number;
 }
 
+export interface RawSmsPayload {
+  id: string; // Unique ID to track failures
+  raw_text: string;
+  source_app: string;
+  latitude: number | null;
+  longitude: number | null;
+  location_name: string | null;
+}
+
 interface AppStoreState {
   // Auth state
   user: User | null;
@@ -110,13 +119,26 @@ interface AppStoreState {
   mapFilters: MapFilters;
   regionSpending: RegionSpending | null;
   isRegionLoading: boolean;
+  pendingSms: RawSmsPayload[];
+  aiInsight: { summary: string; tip: string } | null;
+  isLoadingInsight: boolean;
+  aiGoalSuggestion: { title: string; target_amount: number; description: string; icon: string; color: string; } | null;
+  isGeneratingGoal: boolean;
 
   // Actions
+  fetchAiInsight: () => Promise<void>;
+  clearAiInsight: () => void;
+  fetchAiGoalSuggestion: () => Promise<void>;
+  clearAiGoalSuggestion: () => void;
   sendOtp: (phone_number: string) => Promise<void>;
   verifyOtp: (phone_number: string, otp_code: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   initializeAuth: () => Promise<void>;
+
+  enqueueSms: (payload: Omit<RawSmsPayload, 'id'>) => void;
+  removeSms: (id: string) => void;
+  flushPendingSms: () => Promise<void>;
 
   setMapFilters: (filters: Partial<MapFilters>) => void;
   resetMapFilters: () => void;
@@ -206,16 +228,65 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
   },
   regionSpending: null,
   isRegionLoading: false,
+  pendingSms: [],
+  aiInsight: null,
+  isLoadingInsight: false,
+  aiGoalSuggestion: null,
+  isGeneratingGoal: false,
 
   initializeAuth: async () => {
     const token = await getStorageItem('auth_token');
     const cachedUser = await getStorageItem('auth_user');
+    const cachedSms = await getStorageItem('pending_sms_queue');
     if (token && cachedUser) {
       set({
         token,
         user: JSON.parse(cachedUser),
-        isAuthenticated: true
+        isAuthenticated: true,
+        pendingSms: cachedSms ? JSON.parse(cachedSms) : []
       });
+    }
+  },
+
+  enqueueSms: (payload) => {
+    const newSms = { ...payload, id: Date.now().toString() + Math.random().toString(36).substring(7) };
+    set((state) => {
+      const updated = [...state.pendingSms, newSms];
+      setStorageItem('pending_sms_queue', JSON.stringify(updated));
+      return { pendingSms: updated };
+    });
+  },
+
+  removeSms: (id) => {
+    set((state) => {
+      const updated = state.pendingSms.filter(s => s.id !== id);
+      setStorageItem('pending_sms_queue', JSON.stringify(updated));
+      return { pendingSms: updated };
+    });
+  },
+
+  flushPendingSms: async () => {
+    const { pendingSms, removeSms, token } = get();
+    if (pendingSms.length === 0 || !token) return;
+
+    for (const sms of pendingSms) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/sms/raw`, {
+          method: 'POST',
+          headers: getAuthHeaders(token),
+          body: JSON.stringify(sms),
+        });
+        
+        if (res.ok) {
+          removeSms(sms.id);
+        } else {
+          console.error('[OfflineQueue] Failed to flush SMS:', sms.id, await res.text().catch(() => ''));
+        }
+      } catch (err) {
+        console.error('[OfflineQueue] Network error while flushing SMS:', sms.id, err);
+        // Break the loop, assume network is still down
+        break;
+      }
     }
   },
 
@@ -661,5 +732,45 @@ export const useAppStore = create<AppStoreState>((set, get) => ({
     } finally {
       set({ isLoading: false });
     }
-  }
+  },
+
+  fetchAiInsight: async () => {
+    try {
+      set({ isLoadingInsight: true, error: null });
+      const { token } = get();
+      const res = await fetch(`${API_BASE_URL}/analytics/ai-insights`, {
+        headers: getAuthHeaders(token)
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to fetch AI insight');
+      }
+      const data = await res.json();
+      set({ aiInsight: data, isLoadingInsight: false });
+    } catch (error: any) {
+      set({ error: error.message, isLoadingInsight: false });
+    }
+  },
+
+  clearAiInsight: () => set({ aiInsight: null, error: null }),
+
+  fetchAiGoalSuggestion: async () => {
+    try {
+      set({ isGeneratingGoal: true, error: null, aiGoalSuggestion: null });
+      const { token } = get();
+      const res = await fetch(`${API_BASE_URL}/analytics/ai-goal-suggestion`, {
+        headers: getAuthHeaders(token)
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to generate AI goal suggestion');
+      }
+      const data = await res.json();
+      set({ aiGoalSuggestion: data, isGeneratingGoal: false });
+    } catch (error: any) {
+      set({ error: error.message, isGeneratingGoal: false });
+    }
+  },
+
+  clearAiGoalSuggestion: () => set({ aiGoalSuggestion: null })
 }));

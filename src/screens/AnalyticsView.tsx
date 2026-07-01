@@ -19,6 +19,12 @@ export const AnalyticsView: React.FC = () => {
     summary,
     fetchSpendingByCategory,
     fetchSummary,
+    aiGoalSuggestion,
+    isGeneratingGoal,
+    fetchAiGoalSuggestion,
+    clearAiGoalSuggestion,
+    createGoal,
+    error,
   } = useAppStore();
 
   const [activeRange, setActiveRange] = useState<'all' | 'week' | 'month'>('all');
@@ -56,6 +62,88 @@ export const AnalyticsView: React.FC = () => {
         <View style={styles.headerRow}>
           <Text style={styles.titleText}>Financial Insights</Text>
         </View>
+
+        {/* AI Goal Suggestions */}
+        <GlassCard style={[styles.gaugeCard, { borderColor: 'rgba(139, 92, 246, 0.3)', marginBottom: 20 }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <Icons.Sparkles size={20} color="#8B5CF6" />
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#F9FAFB', marginLeft: 8 }}>AI Smart Goals</Text>
+          </View>
+
+          {!aiGoalSuggestion ? (
+            <>
+              <Text style={{ color: '#9CA3AF', fontSize: 14, marginBottom: 12 }}>
+                Let AI analyze your income and expenses to suggest a personalized savings goal.
+              </Text>
+              <Pressable
+                style={{ backgroundColor: 'rgba(139, 92, 246, 0.15)', borderColor: 'rgba(139, 92, 246, 0.3)', borderWidth: 1, padding: 12, borderRadius: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => fetchAiGoalSuggestion()}
+                disabled={isGeneratingGoal}
+              >
+                {isGeneratingGoal ? (
+                  <Text style={{ color: '#8B5CF6', fontWeight: '600' }}>Analyzing Finances...</Text>
+                ) : (
+                  <>
+                    <Icons.Zap size={16} color="#8B5CF6" style={{ marginRight: 6 }} />
+                    <Text style={{ color: '#8B5CF6', fontWeight: '600' }}>Suggest Goal</Text>
+                  </>
+                )}
+              </Pressable>
+            </>
+          ) : (
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                <View style={{ backgroundColor: aiGoalSuggestion.color, width: 32, height: 32, borderRadius: 16, justifyContent: 'center', alignItems: 'center', marginRight: 12 }}>
+                  {(() => {
+                    const IconComp = Icons[aiGoalSuggestion.icon] || Icons.Target;
+                    return <IconComp size={16} color="#FFFFFF" />;
+                  })()}
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: '#F9FAFB', fontSize: 16, fontWeight: '600' }}>{aiGoalSuggestion.title}</Text>
+                  <Text style={{ color: aiGoalSuggestion.color, fontSize: 14, fontWeight: '500' }}>
+                    Target: ₹{aiGoalSuggestion.target_amount.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ color: '#D1D5DB', fontSize: 14, lineHeight: 20, marginBottom: 16 }}>
+                {aiGoalSuggestion.description}
+              </Text>
+
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <Pressable
+                  style={{ flex: 1, backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(16, 185, 129, 0.3)', borderWidth: 1, padding: 12, borderRadius: 12, alignItems: 'center' }}
+                  onPress={async () => {
+                    await createGoal({
+                      name: aiGoalSuggestion.title,
+                      target_amount: aiGoalSuggestion.target_amount,
+                      target_date: null,
+                      color: aiGoalSuggestion.color,
+                      icon: aiGoalSuggestion.icon
+                    });
+                    clearAiGoalSuggestion();
+                    alert('Goal created successfully! Check your Goals tab.');
+                  }}
+                >
+                  <Text style={{ color: '#10B981', fontWeight: '600' }}>Accept Goal</Text>
+                </Pressable>
+                <Pressable
+                  style={{ flex: 1, backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 12, borderRadius: 12, alignItems: 'center' }}
+                  onPress={clearAiGoalSuggestion}
+                >
+                  <Text style={{ color: '#EF4444', fontWeight: '500' }}>Discard</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
+
+          {error && error.includes('AI') && (
+            <View style={{ marginTop: 16, backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center' }}>
+              <Icons.AlertTriangle size={14} color="#EF4444" style={{ marginRight: 6 }} />
+              <Text style={{ color: '#EF4444', fontSize: 12, flex: 1 }}>{error}</Text>
+            </View>
+          )}
+        </GlassCard>
 
         {/* Date Filter Bar */}
         <GlassCard style={styles.rangeSelectorCard}>

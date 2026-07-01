@@ -87,6 +87,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
     deleteTransaction,
     createTransaction,
     deleteAccount,
+    aiInsight,
+    isLoadingInsight,
+    fetchAiInsight,
+    clearAiInsight,
+    error,
   } = useAppStore();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -147,6 +152,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active') {
         checkPermission();
+        useAppStore.getState().flushPendingSms();
+        useAppStore.getState().fetchTransactions();
+        useAppStore.getState().fetchSummary();
       }
     });
 
@@ -322,11 +330,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
-  const filteredTransactions = transactions.filter((tx) =>
-    tx.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (tx.location_name && tx.location_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (tx.category_name && tx.category_name.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredTransactions = transactions
+    .filter((tx) =>
+      tx.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (tx.location_name && tx.location_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (tx.category_name && tx.category_name.toLowerCase().includes(searchQuery.toLowerCase()))
+    )
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 10);
 
   return (
     <View style={styles.container}>
@@ -394,8 +405,63 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </View>
         </GlassCard>
 
-        {/* Simulated SMS Notification Interceptor Widget */}
-        <GlassCard style={styles.smsCard}>
+        {/* AI Spending Insights Card */}
+        <GlassCard style={[styles.mainBalanceCard, { marginTop: 16, borderColor: 'rgba(139, 92, 246, 0.3)' }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+            <Icons.Sparkles size={20} color="#8B5CF6" />
+            <Text style={{ fontSize: 18, fontWeight: '700', color: '#F9FAFB', marginLeft: 8 }}>AI Insights</Text>
+            {aiInsight && (
+              <View style={{ flexDirection: 'row', marginLeft: 'auto', alignItems: 'center' }}>
+                <Pressable style={{ padding: 8, marginRight: 4, backgroundColor: 'rgba(139, 92, 246, 0.1)', borderRadius: 8 }} onPress={() => fetchAiInsight()}>
+                  <Icons.RefreshCw size={14} color="#8B5CF6" />
+                </Pressable>
+                <Pressable style={{ padding: 8, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 8 }} onPress={() => clearAiInsight()}>
+                  <Icons.X size={16} color="#EF4444" />
+                </Pressable>
+              </View>
+            )}
+          </View>
+
+          {!aiInsight ? (
+            <Pressable 
+              style={[styles.permissionBtn, { marginTop: 0 }]} 
+              onPress={() => fetchAiInsight()}
+              disabled={isLoadingInsight}
+            >
+              {isLoadingInsight ? (
+                <Text style={styles.permissionBtnText}>Generating Insight...</Text>
+              ) : (
+                <>
+                  <Icons.Zap size={14} color="#8B5CF6" />
+                  <Text style={styles.permissionBtnText}>Generate Monthly AI Insight</Text>
+                </>
+              )}
+            </Pressable>
+          ) : (
+            <View>
+              <Text style={{ color: '#D1D5DB', fontSize: 14, lineHeight: 22, marginBottom: 12 }}>
+                {aiInsight.summary}
+              </Text>
+              <View style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'flex-start' }}>
+                <Icons.CheckCircle size={16} color="#10B981" style={{ marginTop: 2, marginRight: 8 }} />
+                <Text style={{ color: '#10B981', fontSize: 14, fontWeight: '500', flex: 1, lineHeight: 20 }}>
+                  {aiInsight.tip}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {error && error.includes('AI') && (
+            <View style={{ marginTop: 12, backgroundColor: 'rgba(239, 68, 68, 0.1)', padding: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center' }}>
+              <Icons.AlertTriangle size={14} color="#EF4444" style={{ marginRight: 6 }} />
+              <Text style={{ color: '#EF4444', fontSize: 12, flex: 1 }}>{error}</Text>
+            </View>
+          )}
+        </GlassCard>
+
+        {/* Simulated SMS Notification Interceptor Widget (Dev Only) */}
+        {__DEV__ && (
+          <GlassCard style={styles.smsCard}>
           <View style={styles.smsHeader}>
             <View style={styles.smsTitleRow}>
               <Icons.MessageSquare size={18} color="#8B5CF6" />
@@ -530,7 +596,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </View>
             </View>
           )}
-        </GlassCard>
+          </GlassCard>
+        )}
 
         {/* Transactions list header & search */}
         <View style={styles.txSectionHeader}>

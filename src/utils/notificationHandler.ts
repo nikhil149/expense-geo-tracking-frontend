@@ -61,10 +61,6 @@ export const backgroundNotificationHandler = async ({ notification }: any) => {
 
     if (!notificationText) return;
 
-    // ── 2. Run the SMS parsing engine ────────────────────────────────
-    const transaction = parseSMSTransaction(notificationText);
-    if (!transaction) return; // Not a bank transaction — ignore silently
-
     // ── 3. Check that the user is logged in ──────────────────────────
     const token = await AsyncStorage.getItem('auth_token');
     if (!token) return;
@@ -76,9 +72,6 @@ export const backgroundNotificationHandler = async ({ notification }: any) => {
 
     try {
       // Read the GPS position that the foreground app cached in AsyncStorage.
-      // This avoids needing ACCESS_BACKGROUND_LOCATION (which triggers
-      // Google Play's strict review). The foreground app updates this cache
-      // whenever it successfully obtains a GPS fix.
       const { getCachedLocation } = require('./locationCache');
       const cached = await getCachedLocation();
 
@@ -94,45 +87,50 @@ export const backgroundNotificationHandler = async ({ notification }: any) => {
       );
     }
 
-    // ── 5. POST the transaction to the backend API ───────────────────
+    // ── 5. POST the RAW SMS to the backend API ───────────────────
     const apiUrl = getBackgroundApiUrl();
 
-    const txData = {
-      title: transaction.title,
-      amount: transaction.amount,
-      type: transaction.type,
-      date: transaction.date || new Date().toISOString(),
+    const rawSmsPayload = {
+      raw_text: notificationText,
+      source_app: parsed.app || 'unknown',
       latitude,
       longitude,
       location_name,
-      notes: `${transaction.notes}\n---\nSource app: ${parsed.app || 'unknown'}\nTitle: ${parsed.title || ''}`,
     };
 
-    const res = await fetch(`${apiUrl}/transactions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(txData),
-    });
+    try {
+      const res = await fetch(`${apiUrl}/sms/raw`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(rawSmsPayload),
+      });
 
-    if (!res.ok) {
-      console.error(
-        '[NotificationHandler] Failed to auto-log transaction:',
-        res.status,
-        await res.text().catch(() => ''),
-      );
-    } else {
-      console.log(
-        '[NotificationHandler] ✅ Auto-logged:',
-        transaction.title,
-        '₹' + transaction.amount,
-        `| Location: ${location_name}`,
-        latitude !== null && longitude !== null
-          ? `(${latitude}, ${longitude})`
-          : '(no coords)',
-      );
+      if (!res.ok) {
+        console.error(
+          '[NotificationHandler] Backend rejected raw SMS:',
+          res.status,
+          await res.text().catch(() => ''),
+        );
+        throw new Error('Backend rejection'); // Force catch block for queueing
+      } else {
+        console.log('[NotificationHandler] ✅ Raw SMS sent successfully');
+      }
+    } catch (networkErr) {
+      console.warn('[NotificationHandler] Network error, queueing SMS for offline processing...', networkErr);
+      // Enqueue to AsyncStorage manually (Zustand might not be fully initialized in headless mode)
+      try {
+        const queueJson = await AsyncStorage.getItem('pending_sms_queue');
+        const queue = queueJson ? JSON.parse(queueJson) : [];
+        const newSms = { ...rawSmsPayload, id: Date.now().toString() + Math.random().toString(36).substring(7) };
+        queue.push(newSms);
+        await AsyncStorage.setItem('pending_sms_queue', JSON.stringify(queue));
+        console.log('[NotificationHandler] 📝 SMS queued locally');
+      } catch (storageErr) {
+        console.error('[NotificationHandler] Fatal: failed to enqueue SMS locally', storageErr);
+      }
     }
   } catch (error) {
     console.error('[NotificationHandler] Unhandled error:', error);
