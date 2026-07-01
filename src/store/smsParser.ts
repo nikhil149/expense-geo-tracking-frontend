@@ -5,7 +5,7 @@
 export interface ParsedTransaction {
   amount: number;
   title: string;
-  type: 'expense' | 'income' | 'investment';
+  type: 'expense' | 'income';
   notes: string;
   date?: string;
   payment_method?: 'credit_card' | 'debit_card' | 'upi' | 'net_banking' | 'wallet' | 'unknown';
@@ -74,16 +74,16 @@ export function parseSMSTransaction(message: string): ParsedTransaction | null {
   if (isNaN(amount) || amount <= 0) return null;
 
   // 3. Type classification
-  let type: 'expense' | 'income' | 'investment' = 'expense';
+  let type: 'expense' | 'income' = 'expense';
   if (text.includes('passbook balance') || text.includes('contribution') || text.includes('provident fund') || text.includes('epfo')) {
-    type = 'investment';
+    type = 'expense';
   } else if (text.includes('deposited') || text.includes('credited') || text.includes('salary') || (text.includes('received') && !text.includes('credit card'))) {
     type = 'income';
   } else if (
     text.includes('invested') || text.includes('investment') || text.includes('mutual fund') || text.includes('sip') ||
     text.includes('zerodha') || text.includes('groww') || text.includes('upstox')
   ) {
-    type = 'investment';
+    type = 'expense';
   }
 
   // 4. Payment Method & Card Name Detection
@@ -161,7 +161,7 @@ export function parseSMSTransaction(message: string): ParsedTransaction | null {
     const rawBroker = brokerMatch[1].trim();
     merchant = `${rawBroker} Investment`;
     merchant_name = rawBroker;
-    type = 'investment'; // Force investment type
+    type = 'expense'; // Force expense type for investments
   } else if (nachMatch) {
     const isCredit = nachMatch[1].toLowerCase() === 'credit';
     const rawMerchant = nachMatch[2]?.trim();
@@ -173,7 +173,7 @@ export function parseSMSTransaction(message: string): ParsedTransaction | null {
     } else {
       merchant = rawMerchant ? `NACH Investment - ${rawMerchant}` : 'NACH SIP Investment';
       merchant_name = rawMerchant || 'NACH Debit';
-      type = 'investment';
+      type = 'expense';
     }
   } else if (creditCardPaymentMatch) {
     const cardNum = creditCardPaymentMatch[1];

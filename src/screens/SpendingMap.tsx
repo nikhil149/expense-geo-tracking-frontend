@@ -477,7 +477,7 @@ export const SpendingMap: React.FC<SpendingMapProps> = ({ onEditTransactionPress
                         <Text
                           style={[
                             styles.locItemAmt,
-                            { color: loc.type === 'income' ? '#10B981' : loc.type === 'investment' ? '#6366F1' : '#EF4444' },
+                            { color: loc.type === 'income' ? '#10B981' : (loc.category_name === 'Investments' ? '#6366F1' : '#EF4444') },
                           ]}
                         >
                           {isExpense ? '-' : '+'}₹{loc.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}

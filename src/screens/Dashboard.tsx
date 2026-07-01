@@ -704,7 +704,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     <Text
                       style={[
                         styles.txAmount,
-                        { color: isIncome ? '#10B981' : tx.type === 'investment' ? '#6366F1' : tx.type === 'transfer' ? '#F59E0B' : '#EF4444' },
+                        { color: isIncome ? '#10B981' : tx.type === 'transfer' ? '#F59E0B' : (tx.category_name === 'Investments' ? '#6366F1' : '#EF4444') },
                       ]}
                     >
                       {tx.type === 'transfer' ? '↔' : isIncome ? '+' : '-'}₹{txAmt.toLocaleString('en-IN', {

@@ -57,7 +57,7 @@ export const TransactionForm = ({
   // Form fields
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
-  const [type, setType] = useState<'income' | 'expense' | 'investment' | 'transfer'>('expense');
+  const [type, setType] = useState<'income' | 'expense' | 'transfer'>('expense');
   const [date, setDate] = useState('');
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [notes, setNotes] = useState('');
@@ -373,7 +373,7 @@ export const TransactionForm = ({
       longitude,
       location_name: locationName || null,
       notes: notes || null,
-      goal_id: type === 'investment' || goalId ? goalId : null,
+      goal_id: goalId ? goalId : null,
     };
 
     try {
@@ -405,7 +405,7 @@ export const TransactionForm = ({
 
         {/* Transaction Type Selector */}
         <View style={styles.typeSelector}>
-          {(['expense', 'income', 'investment', 'transfer'] as const).map((t) => {
+          {(['expense', 'income', 'transfer'] as const).map((t) => {
             const label = t === 'transfer' ? 'Self/Family' : t;
             return (
             <Pressable
@@ -415,7 +415,6 @@ export const TransactionForm = ({
                 type === t && styles.typeBtnActive,
                 type === t && t === 'expense' && { backgroundColor: 'rgba(239, 68, 68, 0.15)' },
                 type === t && t === 'income' && { backgroundColor: 'rgba(16, 185, 129, 0.15)' },
-                type === t && t === 'investment' && { backgroundColor: 'rgba(99, 102, 241, 0.15)' },
                 type === t && t === 'transfer' && { backgroundColor: 'rgba(245, 158, 11, 0.15)' },
               ]}
               onPress={() => setType(t)}
@@ -424,7 +423,7 @@ export const TransactionForm = ({
                 style={[
                   styles.typeBtnText,
                   type === t && {
-                    color: t === 'expense' ? '#EF4444' : t === 'income' ? '#10B981' : t === 'investment' ? '#6366F1' : '#F59E0B',
+                    color: t === 'expense' ? '#EF4444' : t === 'income' ? '#10B981' : '#F59E0B',
                     fontWeight: '800',
                   },
                 ]}
@@ -592,7 +591,7 @@ export const TransactionForm = ({
         </ScrollView>
 
         {/* Savings Goal integration */}
-        {(type === 'investment' || goalId !== null) && (
+        {(goalId !== null) && (
           <View style={styles.goalSelectWrapper}>
             <Text style={styles.inputLabel}>Link to Savings Goal</Text>
             <ScrollView
