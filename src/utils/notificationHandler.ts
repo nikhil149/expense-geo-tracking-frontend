@@ -63,7 +63,7 @@ export const backgroundNotificationHandler = async ({ notification }: any) => {
 
     // ── 2.5 Pre-Filter: Ignore non-financial messages ────────────────
     const lowerText = notificationText.toLowerCase();
-    const isFinancial = /(debited|credited|spent|rs\.?|inr|₹|payment|txn|transaction|a\/c|account|upi|sent|received)/i.test(lowerText);
+    const isFinancial = /(?:\b(debited|credited|spent|rs\.?|inr|payment|txn|transaction|account|upi|sent|received)\b|₹|a\/c)/i.test(lowerText);
     
     if (!isFinancial) {
       return; // Silently drop, don't waste API calls
