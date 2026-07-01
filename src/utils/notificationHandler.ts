@@ -61,12 +61,72 @@ export const backgroundNotificationHandler = async ({ notification }: any) => {
 
     if (!notificationText) return;
 
+    // ── 2.0 Pre-Filter: Check Sender App Whitelist ───────────────────
+    const appPackage = parsed.app || '';
+    const ALLOWED_APPS = [
+      'com.google.android.apps.messaging', // Google Messages
+      'com.samsung.android.messaging', // Samsung Messages
+      'com.apple.MobileSMS', // iOS Messages
+      // Add typical Indian Banking apps that send Push notifications instead of SMS:
+      'com.sbi.SBIFreedomPlus', 'com.sbi.lotusintouch', // SBI
+      'com.hdfcbank.payzapp', 'com.snapwork.hdfc', 'com.hdfcbank.android.now', // HDFC
+      'com.csam.icici.bank.imobile', // ICICI
+      'com.axis.mobile', // Axis
+      'com.zerodha.kite3', 'com.zerodha.coin', 'com.phonepe.app'
+    ];
+
+    if (appPackage && !ALLOWED_APPS.includes(appPackage)) {
+      // Allow 'unknown' if testing/mocking, otherwise block
+      if (appPackage !== 'unknown') {
+        return; // Silently drop notifications from WhatsApp, Instagram, etc.
+      }
+    }
+
     // ── 2.5 Pre-Filter: Ignore non-financial messages ────────────────
     const lowerText = notificationText.toLowerCase();
     const isFinancial = /(?:\b(debited|credited|spent|rs\.?|inr|payment|txn|transaction|account|upi|sent|received)\b|₹|a\/c)/i.test(lowerText);
-    
+
     if (!isFinancial) {
       return; // Silently drop, don't waste API calls
+    }
+
+    // ── 2.8 Pre-Filter: Deduplicate same amounts within 3 minutes ──
+    const amounts: number[] = [];
+    for (const m of notificationText.matchAll(/(?:rs\.?|inr|₹)\s*([\d,]+\.?\d*)/gi)) amounts.push(parseFloat(m[1].replace(/,/g, '')));
+    for (const m of notificationText.matchAll(/(?:debited|credited|spent|payment of)\s*([\d,]+\.?\d*)/gi)) amounts.push(parseFloat(m[1].replace(/,/g, '')));
+    for (const m of notificationText.matchAll(/([\d,]+\.?\d*)\s*(?:debited|credited|spent)/gi)) amounts.push(parseFloat(m[1].replace(/,/g, '')));
+    const uniqueAmounts = [...new Set(amounts.filter(a => !isNaN(a) && a > 0))];
+
+    if (uniqueAmounts.length > 0) {
+      try {
+        const storedRecents = await AsyncStorage.getItem('recent_amounts');
+        let recentAmounts: { amount: number, time: number }[] = storedRecents ? JSON.parse(storedRecents) : [];
+        const now = Date.now();
+        const THREE_MINUTES = 3 * 60 * 1000;
+
+        // Clean up old entries
+        recentAmounts = recentAmounts.filter(entry => now - entry.time < THREE_MINUTES);
+
+        // Check for duplicates
+        let isDuplicate = false;
+        for (const amount of uniqueAmounts) {
+          if (recentAmounts.some(entry => entry.amount === amount)) {
+            isDuplicate = true;
+            break;
+          }
+        }
+
+        if (isDuplicate) {
+          console.log(`[SMS] Dropping duplicate notification for amount(s) ${uniqueAmounts.join(', ')}`);
+          return;
+        }
+
+        // Add new amounts and save
+        uniqueAmounts.forEach(amount => recentAmounts.push({ amount, time: now }));
+        await AsyncStorage.setItem('recent_amounts', JSON.stringify(recentAmounts));
+      } catch (e) {
+        console.warn('[SMS] Failed to read/write recent amounts', e);
+      }
     }
 
     // ── 3. Check that the user is logged in ──────────────────────────
