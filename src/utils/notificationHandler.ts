@@ -105,7 +105,7 @@ export const backgroundNotificationHandler = async ({ notification }: any) => {
       latitude,
       longitude,
       location_name,
-      notes: `Auto-captured via OS notification.\nSource app: ${parsed.app || 'unknown'}\nTitle: ${parsed.title || ''}`,
+      notes: `${transaction.notes}\n---\nSource app: ${parsed.app || 'unknown'}\nTitle: ${parsed.title || ''}`,
     };
 
     const res = await fetch(`${apiUrl}/transactions`, {
